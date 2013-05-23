@@ -41,21 +41,21 @@ func scan_line(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	// }
 }
 
-func parse_file(fname string) error {
+func parse_file(fname string) (*ReqFile, error) {
 	fmt.Printf("req=%q\n", fname)
 	var err error
 	f, err := os.Open(fname)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer f.Close()
 
 	scanner := bufio.NewScanner(bufio.NewReader(f))
 	if scanner == nil {
-		return fmt.Errorf("cmt2yml: nil bufio.Scanner")
+		return nil, fmt.Errorf("cmt2yml: nil bufio.Scanner")
 	}
 
-	req := ReqFile{}
+	req := ReqFile{Filename: fname}
 
 	bline := []byte{}
 	ctx := []string{"public"}
@@ -82,7 +82,7 @@ func parse_file(fname string) error {
 		var tokens []string
 		tokens, err = parse_line(bline)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		switch tokens[0] {
@@ -296,13 +296,13 @@ func parse_file(fname string) error {
 			req.Actions = append(req.Actions, vv)
 
 		default:
-			return fmt.Errorf("cmt2yml: unknown token [%v]", tokens[0])
+			return nil, fmt.Errorf("cmt2yml: unknown token [%v]", tokens[0])
 		}
 		bline = nil
 	}
 
 	fmt.Printf("req=%q [done]\n", fname)
-	return err
+	return &req, err
 }
 
 func parse_line(data []byte) ([]string, error) {

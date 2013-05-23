@@ -43,8 +43,14 @@ func main() {
 	})
 	handle_err(err)
 
-	for _, fname := range fnames {
-		err = parse_file(fname)
+	reqfiles := make([]*ReqFile, len(fnames))
+	for i, fname := range fnames {
+		reqfiles[i], err = parse_file(fname)
+		handle_err(err)
+	}
+
+	for _, req := range reqfiles {
+		err = render_yaml(req)
 		handle_err(err)
 	}
 }

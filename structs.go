@@ -36,8 +36,8 @@ const (
 )
 
 type ReqFile struct {
-	Package string
-	//	Stmts []Statement
+	Filename        string
+	Package         string
 	Authors         []string
 	Managers        []string
 	Uses            []UsePkg
