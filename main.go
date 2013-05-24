@@ -43,15 +43,54 @@ func main() {
 	})
 	handle_err(err)
 
-	reqfiles := make([]*ReqFile, len(fnames))
-	for i, fname := range fnames {
-		reqfiles[i], err = parse_file(fname)
-		handle_err(err)
+	type Response struct {
+		req *ReqFile
+		err error
 	}
 
-	for _, req := range reqfiles {
-		err = render_yaml(req)
-		handle_err(err)
+	ch := make(chan Response)
+	for _, fname := range fnames {
+		go func(fname string) {
+			reqfile, err := parse_file(fname)
+			if err != nil {
+				ch <- Response{
+					reqfile,
+					fmt.Errorf("err w/ file [%s]: %v", fname, err),
+				}
+				return
+			}
+			err = render_yaml(reqfile)
+			if err != nil {
+				ch <- Response{
+					reqfile,
+					fmt.Errorf("err w/ file [%s]: %v", fname, err),
+				}
+				return
+			}
+			ch <- Response{reqfile, nil}
+		}(fname)
+	}
+
+	sum := 0
+	allgood := true
+loop:
+	for {
+		select {
+		case resp := <-ch:
+			sum += 1
+			if resp.err != nil {
+				fmt.Printf("**err: %v\n", err)
+				allgood = false
+			}
+			if sum == len(fnames) {
+				close(ch)
+				break loop
+			}
+		}
+	}
+
+	if !allgood {
+		os.Exit(1)
 	}
 }
 

@@ -41,31 +41,61 @@ func scan_line(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	// }
 }
 
-func parse_file(fname string) (*ReqFile, error) {
-	fmt.Printf("req=%q\n", fname)
+type Parser struct {
+	req       *ReqFile
+	isPrivate bool
+
+	table   map[string]ParseFunc
+	f       *os.File
+	scanner *bufio.Scanner
+	ctx     []string
+	tokens  []string
+}
+
+func (p *Parser) Close() error {
+	if p.f == nil {
+		return nil
+	}
+	err := p.f.Close()
+	p.f = nil
+	return err
+}
+
+func NewParser(fname string) (*Parser, error) {
+
 	var err error
 	f, err := os.Open(fname)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 
 	scanner := bufio.NewScanner(bufio.NewReader(f))
 	if scanner == nil {
 		return nil, fmt.Errorf("cmt2yml: nil bufio.Scanner")
 	}
 
-	req := ReqFile{Filename: fname}
+	p := &Parser{
+		table:   g_dispatch,
+		f:       f,
+		scanner: scanner,
+		req:     &ReqFile{Filename: fname},
+		tokens:  nil,
+		ctx:     []string{tok_PUBLIC},
+	}
+	return p, nil
+}
 
+func (p *Parser) run() error {
+	var err error
 	bline := []byte{}
-	ctx := []string{"public"}
-	for scanner.Scan() {
-		data := scanner.Bytes()
+	for p.scanner.Scan() {
+		data := p.scanner.Bytes()
 		data = bytes.TrimSpace(data)
 
 		if len(data) == 0 {
 			continue
 		}
+
 		if data[0] == '#' {
 			continue
 		}
@@ -77,232 +107,39 @@ func parse_file(fname string) (*ReqFile, error) {
 		} else {
 			bline = append(bline, data...)
 		}
-		//fmt.Printf("%q\n", string(bline))
 
 		var tokens []string
 		tokens, err = parse_line(bline)
 		if err != nil {
-			return nil, err
+			return err
 		}
+		p.tokens = tokens
 
-		switch tokens[0] {
-		case tok_PACKAGE:
-			req.Package = tokens[1]
-
-		case tok_AUTHOR:
-			req.Authors = append(
-				req.Authors,
-				tokens[1:]...,
-			)
-
-		case tok_MANAGER:
-			req.Managers = append(
-				req.Managers,
-				tokens[1:]...,
-			)
-
-		case tok_USE:
-			use := UsePkg{Package: tokens[1]}
-			if len(tokens) > 2 {
-				use.Version = tokens[2]
-			}
-			if len(tokens) > 3 {
-				use.Path = tokens[3]
-			}
-			if len(tokens) > 4 {
-				use.Switches = append(use.Switches, tokens[4:]...)
-			}
-			req.Uses = append(req.Uses, use)
-
-		case tok_MACRO:
-			//fmt.Printf("macro: %v\n", fmt_line(tokens))
-			vv := Macro{Name: tokens[1]}
-			vv.Value = make(map[string]string)
-			vv.Value["default"] = tokens[2]
-			if len(tokens) > 3 {
-				toks := tokens[3:]
-				for i := 0; i+1 < len(toks); i += 2 {
-					vv.Value[toks[i]] = toks[i+1]
-				}
-			}
-			req.Macros = append(req.Macros, vv)
-			//fmt.Printf("macro: %v\n", macro)
-
-		case tok_MACRO_APPEND:
-			vv := MacroAppend{Name: tokens[1]}
-			vv.Value = make(map[string]string)
-			vv.Value["default"] = tokens[2]
-			if len(tokens) > 3 {
-				toks := tokens[3:]
-				for i := 0; i+1 < len(toks); i += 2 {
-					vv.Value[toks[i]] = toks[i+1]
-				}
-			}
-			req.MacroAppends = append(req.MacroAppends, vv)
-
-		case tok_MACRO_PREPEND:
-			vv := MacroPrepend{Name: tokens[1]}
-			vv.Value = make(map[string]string)
-			vv.Value["default"] = tokens[2]
-			if len(tokens) > 3 {
-				toks := tokens[3:]
-				for i := 0; i+1 < len(toks); i += 2 {
-					vv.Value[toks[i]] = toks[i+1]
-				}
-			}
-			req.MacroPrepends = append(req.MacroPrepends, vv)
-
-		case tok_PATH:
-			vv := Path{Name: tokens[1], Value: tokens[2]}
-			req.Paths = append(req.Paths, vv)
-
-		case tok_PATH_PREPEND:
-			vv := PathPrepend{Name: tokens[1]}
-			vv.Value = make(map[string]string)
-			vv.Value["default"] = tokens[2]
-			if len(tokens) > 3 {
-				toks := tokens[3:]
-				for i := 0; i+1 < len(toks); i += 2 {
-					vv.Value[toks[i]] = toks[i+1]
-				}
-			}
-			req.PathPrepends = append(req.PathPrepends, vv)
-
-		case tok_PATH_APPEND:
-			vv := PathAppend{Name: tokens[1]}
-			vv.Value = make(map[string]string)
-			vv.Value["default"] = tokens[2]
-			if len(tokens) > 3 {
-				toks := tokens[3:]
-				for i := 0; i+1 < len(toks); i += 2 {
-					vv.Value[toks[i]] = toks[i+1]
-				}
-			}
-			req.PathAppends = append(req.PathAppends, vv)
-
-		case tok_PATH_REMOVE:
-			vv := PathRemove{Name: tokens[1]}
-			vv.Value = make(map[string]string)
-			vv.Value["default"] = tokens[2]
-			if len(tokens) > 3 {
-				toks := tokens[3:]
-				for i := 0; i+1 < len(toks); i += 2 {
-					vv.Value[toks[i]] = toks[i+1]
-				}
-			}
-			req.PathRemoves = append(req.PathRemoves, vv)
-
-		case tok_PATTERN:
-			//fmt.Printf("pattern: %v (%d)\n", fmt_line(tokens), len(tokens))
-			vv := Pattern{
-				Name: tokens[1],
-				Def:  strings.Join(tokens[2:], " "),
-			}
-			req.Patterns = append(req.Patterns, vv)
-
-		case tok_APPLY_PATTERN:
-			vv := ApplyPattern{Name: tokens[1]}
-			if len(tokens) > 2 {
-				vv.Args = append(vv.Args, tokens[2:]...)
-			}
-			req.ApplyPatterns = append(req.ApplyPatterns, vv)
-
-		case tok_IGNORE_PATTERN:
-			vv := IgnorePattern{Name: tokens[1]}
-			req.IgnorePatterns = append(req.IgnorePatterns, vv)
-
-		case tok_INCLUDE_DIRS:
-			vv := IncludeDirs{Value: tokens[1]}
-			req.IncludeDirs = append(req.IncludeDirs, vv)
-
-		case tok_INCLUDE_PATH:
-			vv := IncludePaths{Value: tokens[1]}
-			req.IncludePaths = append(req.IncludePaths, vv)
-
-		case tok_PRIVATE:
-			ctx = append(ctx, tok_PRIVATE)
-
-		case tok_END_PRIVATE:
-			ctx = ctx[:len(ctx)-1]
-
-		case tok_PUBLIC:
-			ctx = append(ctx, tok_PUBLIC)
-
-		case tok_END_PUBLIC:
-			ctx = ctx[:len(ctx)-1]
-
-		case tok_APPLICATION:
-			vv := Application{Name: tokens[1]}
-			if len(tokens) > 2 {
-				vv.Source = append(vv.Source, tokens[2:]...)
-			}
-			req.Applications = append(req.Applications, vv)
-
-		case tok_LIBRARY:
-			vv := Library{Name: tokens[1]}
-			if len(tokens) > 2 {
-				vv.Source = append(vv.Source, tokens[2:]...)
-			}
-			req.Libraries = append(req.Libraries, vv)
-
-		case tok_DOCUMENT:
-			vv := Document{
-				Name:   tokens[1],
-				Source: make([]string, 0, len(tokens[2:])), //FIXME
-			}
-			vv.Source = append(vv.Source, tokens[2:]...)
-			req.Documents = append(req.Documents, vv)
-
-		case tok_SET:
-			vv := SetEnv{Name: tokens[1]}
-			vv.Value = make(map[string]string)
-			vv.Value["default"] = tokens[2]
-			if len(tokens) > 3 {
-				toks := tokens[3:]
-				for i := 0; i+1 < len(toks); i += 2 {
-					vv.Value[toks[i]] = toks[i+1]
-				}
-			}
-			req.Sets = append(req.Sets, vv)
-
-		case tok_TAG:
-			vv := Tag{Name: tokens[1]}
-			vv.Content = append(vv.Content, tokens[2:]...)
-			req.Tags = append(req.Tags, vv)
-
-		case tok_VERSION:
-			vv := Version{Value: tokens[1]}
-			req.Version = &vv
-
-		case tok_CMTPATH_PATTERN:
-			vv := CmtPathPattern{}
-			vv.Cmd = append(vv.Cmd, tokens[2:]...)
-			req.CmtPathPatterns = append(req.CmtPathPatterns, vv)
-
-		case tok_MAKE_FRAGMENT:
-			vv := MakeFragment{Name: tokens[1]}
-			req.MakeFragments = append(req.MakeFragments, vv)
-
-		case tok_ACTION:
-			vv := Action{Name: tokens[1]}
-			vv.Value = make(map[string]string)
-			vv.Value["default"] = tokens[2]
-			if len(tokens) > 3 {
-				toks := tokens[3:]
-				for i := 0; i+1 < len(toks); i += 2 {
-					vv.Value[toks[i]] = toks[i+1]
-				}
-			}
-			req.Actions = append(req.Actions, vv)
-
-		default:
-			return nil, fmt.Errorf("cmt2yml: unknown token [%v]", tokens[0])
+		fct, ok := p.table[p.tokens[0]]
+		if !ok {
+			return fmt.Errorf("cmt2yml: unknown token [%v]", tokens[0])
+		}
+		err = fct(p)
+		if err != nil {
+			return err
 		}
 		bline = nil
 	}
 
+	return err
+}
+
+func parse_file(fname string) (*ReqFile, error) {
+	fmt.Printf("req=%q\n", fname)
+	p, err := NewParser(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer p.Close()
+
+	err = p.run()
 	fmt.Printf("req=%q [done]\n", fname)
-	return &req, err
+	return p.req, err
 }
 
 func parse_line(data []byte) ([]string, error) {
