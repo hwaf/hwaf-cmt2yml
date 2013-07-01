@@ -1,0 +1,3 @@
+macro app_inst_group			"inst" \
+		ppc-rtems-rce405	"____"
+

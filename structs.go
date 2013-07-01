@@ -297,6 +297,9 @@ func (s *Pattern) ToYaml(w io.Writer) error {
 func parsePattern(p *Parser) error {
 	var err error
 	tokens := p.tokens
+	if tokens[1][0] == '-' {
+		tokens[1], tokens[2] = tokens[2], tokens[1]
+	}
 	vv := Pattern{
 		Name: tokens[1],
 		Def:  strings.Join(tokens[2:], " "),
@@ -317,6 +320,9 @@ func (s *ApplyPattern) ToYaml(w io.Writer) error {
 func parseApplyPattern(p *Parser) error {
 	var err error
 	tokens := p.tokens
+	if tokens[1][0] == '-' {
+		tokens[1], tokens[2] = tokens[2], tokens[1]
+	}
 	vv := ApplyPattern{Name: tokens[1]}
 	if len(tokens) > 2 {
 		vv.Args = append(vv.Args, tokens[2:]...)

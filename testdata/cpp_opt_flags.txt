@@ -1,0 +1,19 @@
+macro		cpp_opt_flags		""												\
+		x86_64-slc4&gcc34	" -O2 -mtune=nocona -fomit-frame-pointer "    							\
+		x86_64-slc4&gcc43	" -O2 -mtune=nocona -fomit-frame-pointer "    							\
+ 		x86_64-slc6&gcc46       " -O2 -mtune=core2 -std=c++0x -ftree-vectorize -ftree-vectorizer-verbose=2 -fomit-frame-pointer "          \
+ 		x86_64-slc6&gcc47       " -O2 -mtune=core2 -std=c++11 -ftree-vectorize -ftree-vectorizer-verbose=2 -fomit-frame-pointer "          \
+		x86_64-slc6&gcc4	" -O2 -mtune=nocona -fomit-frame-pointer "    							\
+ 		x86_64-slc5&gcc43	" -O2 -mtune=nocona -fomit-frame-pointer "    							\
+ 		x86_64-slc5&gcc46       " -O2 -mtune=core2 -std=c++0x -ftree-vectorize -ftree-vectorizer-verbose=2 -fomit-frame-pointer "          \
+ 		x86_64-slc5&gcc47       " -O2 -mtune=core2 -std=c++11 -ftree-vectorize -ftree-vectorizer-verbose=2 -fomit-frame-pointer "          \
+		gcc32			" -O2 -march=i686 -mcpu=i686 -funroll-loops -falign-loops -falign-jumps -falign-functions "	\
+		gcc323			" -O2 -mcpu=pentium4 -funroll-loops -falign-loops -falign-jumps -falign-functions "		\
+		i686-slc4&gcc34		" -O2 -mtune=pentium4 -funroll-loops -falign-loops -falign-jumps -falign-functions "		\
+		i686-slc4&gcc43		" -O2 -mtune=pentium4 -funroll-loops -falign-loops -falign-jumps -falign-functions "		\
+		i686-slc5&gcc4		" -O2 -mtune=pentium4 -funroll-loops -falign-loops -falign-jumps -falign-functions "		\
+		i686-slc6&gcc4		" -O2 -mtune=pentium4 -funroll-loops -falign-loops -falign-jumps -falign-functions "		\
+		icc8			" -O2 -mtune=pentium4 "										\
+		icc11			" -O2 -axSSSE3 -vec-report1 -par-report1 -parallel " \
+                powerpc-rtems-gcc43     " -O4 -mlongcall -msoft-float "
+		

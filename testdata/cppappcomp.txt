@@ -1,0 +1,3 @@
+macro		cppappcomp	 '$(cppcomp) '	\
+                ppc-rtems-rce405 'echo'
+

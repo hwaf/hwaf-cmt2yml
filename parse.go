@@ -91,6 +91,7 @@ func (p *Parser) run() error {
 	for p.scanner.Scan() {
 		data := p.scanner.Bytes()
 		data = bytes.TrimSpace(data)
+		data = bytes.Trim(data, " \t\r\n")
 
 		if len(data) == 0 {
 			continue
@@ -102,9 +103,11 @@ func (p *Parser) run() error {
 
 		idx := len(data) - 1
 		if data[idx] == '\\' {
+			bline = append(bline, ' ')
 			bline = append(bline, data[:idx-1]...)
 			continue
 		} else {
+			bline = append(bline, ' ')
 			bline = append(bline, data...)
 		}
 
@@ -171,30 +174,60 @@ func parse_line(data []byte) ([]string, error) {
 	in_dquote := false
 	in_squote := false
 	for i := 0; i < len(tokens); i++ {
-		tok := tokens[i]
-		my_printf("tok[%d]=%q\n", i, tok)
+		tok := strings.Trim(tokens[i], " \t")
+		my_printf("tok[%d]=%q    (q=%v)\n", i, tok, in_squote || in_dquote)
 		if in_squote || in_dquote {
 			if len(line) > 0 {
-				line[len(line)-1] += " " + tok
+				ttok := tok
+				if strings.HasPrefix(ttok, `"`) || strings.HasPrefix(ttok, "'") {
+					ttok = ttok[1:]
+				}
+				if strings.HasSuffix(ttok, `"`) || strings.HasSuffix(ttok, "'") {
+					ttok = ttok[:len(ttok)-1]
+				}
+				ttok = strings.Trim(ttok, " \t")
+				if len(ttok) > 0 {
+					line_val := line[len(line)-1]
+					line_sep := ""
+					if len(line_val) > 0 {
+						line_sep = " "
+					}
+					line[len(line)-1] += line_sep + ttok
+				}
 			} else {
 				panic("logic error")
 			}
 		} else {
-			line = append(line, tok)
+			ttok := tok
+			if strings.HasPrefix(ttok, `"`) || strings.HasPrefix(ttok, "'") {
+				ttok = ttok[1:]
+			}
+			if strings.HasSuffix(ttok, `"`) || strings.HasSuffix(ttok, "'") {
+				ttok = ttok[:len(ttok)-1]
+			}
+			line = append(line, strings.Trim(ttok, " \t"))
 		}
-		if strings.HasPrefix(tok, `"`) && !strings.HasSuffix(tok, `"`) {
+		if len(tok) == 1 && strings.HasPrefix(tok, "\"") {
+			in_dquote = !in_dquote
+			continue
+		}
+		if len(tok) == 1 && strings.HasPrefix(tok, "'") {
+			in_squote = !in_squote
+			continue
+		}
+		if strings.HasPrefix(tok, "\"") && !strings.HasSuffix(tok, "\"") {
 			in_dquote = !in_dquote
 			my_printf("--> dquote: %v -> %v\n", !in_dquote, in_dquote)
 		}
-		if strings.HasPrefix(tok, `'`) && !strings.HasSuffix(tok, `'`) {
+		if strings.HasPrefix(tok, "'") && !strings.HasSuffix(tok, "'") {
 			in_squote = !in_squote
 			my_printf("--> squote: %v -> %v\n", !in_squote, in_squote)
 		}
-		if in_dquote && strings.HasSuffix(tok, `"`) {
+		if in_dquote && strings.HasSuffix(tok, "\"") {
 			in_dquote = !in_dquote
 			my_printf("<-- dquote: %v -> %v\n", !in_dquote, in_dquote)
 		}
-		if in_squote && strings.HasSuffix(tok, `'`) {
+		if in_squote && strings.HasSuffix(tok, "'") {
 			in_squote = !in_squote
 			my_printf("<-- squote: %v -> %v\n", !in_squote, in_squote)
 		}

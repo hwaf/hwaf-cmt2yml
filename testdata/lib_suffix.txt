@@ -1,0 +1,3 @@
+macro lib_suffix			".so" \
+		ppc-rtems-rce405	".a"
+
