@@ -99,13 +99,21 @@ func render_yaml(req *ReqFile) error {
 	return err
 }
 
-func sanitize_srcs(sources []string) []string {
-	for i, src := range sources {
+func sanitize_srcs(sources []string) (srcs []string, rest []string) {
+	srcs = make([]string, 0, len(sources))
+	rest = make([]string, 0)
+	for _, src := range sources {
 		if strings.HasPrefix(src, "../") {
-			sources[i] = src[len("../"):]
+			src = src[len("../"):]
 		}
+		if strings.HasPrefix(src, "-") {
+			// discard -globals -no_prototypes -s=$(some)/src
+			rest = append(rest, src)
+			continue
+		}
+		srcs = append(srcs, src)
 	}
-	return sources
+	return srcs, rest
 }
 
 func sanitize_env_string(v string) string {

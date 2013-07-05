@@ -95,6 +95,20 @@ import waflib.Logs as msg
 	apps := map[string]*Application{}
 	//dictlibs := map[string]struct{}{}
 
+	// first pass to detect targets
+	for _, stmt := range r.req.Stmts {
+		switch stmt.(type) {
+		case *Application:
+			x := stmt.(*Application)
+			apps[x.Name] = x
+
+		case *Library:
+			x := stmt.(*Library)
+			linklibs[x.Name] = x
+		}
+	}
+
+	// second pass to collect
 	for _, stmt := range r.req.Stmts {
 		wpkg := &wscript.Package
 		wbld := &wscript.Build

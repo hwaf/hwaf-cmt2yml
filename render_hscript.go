@@ -210,6 +210,20 @@ func (r *Renderer) render_hscript() error {
 	apps := map[string]*Application{}
 	//dictlibs := map[string]struct{}{}
 
+	// first pass to detect targets
+	for _, stmt := range r.req.Stmts {
+		switch stmt.(type) {
+		case *Application:
+			x := stmt.(*Application)
+			apps[x.Name] = x
+
+		case *Library:
+			x := stmt.(*Library)
+			linklibs[x.Name] = x
+		}
+	}
+
+	// second pass to collect
 	for _, stmt := range r.req.Stmts {
 		hpkg := &hscript.Package
 		hbld := hscript.Build
@@ -261,6 +275,11 @@ func (r *Renderer) render_hscript() error {
 		}
 
 		if p, ok := stmt.(*Macro); ok {
+			if strings.HasSuffix(p.Name, "_dependencies") {
+				// handled elsewhere
+				continue
+			}
+
 			fmt.Printf("--- %q %v\n", p.Name, p.Value)
 			vv := init_env_map_from(hcfg.Env, p.Name)
 			for tag, v := range p.Value {
@@ -273,6 +292,10 @@ func (r *Renderer) render_hscript() error {
 		}
 
 		if p, ok := stmt.(*MacroAppend); ok {
+			if strings.HasSuffix(p.Name, "_dependencies") {
+				// handled elsewhere
+				continue
+			}
 			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
 			vv := init_env_map_from(hcfg.Env, p.Name)
 			for tag, v := range p.Value {
