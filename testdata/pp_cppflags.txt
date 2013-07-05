@@ -1,0 +1,1 @@
+macro_append pp_cppflags	' -DTDAQ_PACKAGE_NAME=\"$(package)\" '

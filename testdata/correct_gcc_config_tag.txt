@@ -1,0 +1,2 @@
+macro		correct_gcc_config_tag		"i686-slc5-gcc43-opt"		\
+		x86_64			"x86_64-slc5"

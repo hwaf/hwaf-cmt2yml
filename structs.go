@@ -22,6 +22,11 @@ func NewReqFile(name string) ReqFile {
 	}
 }
 
+func (req *ReqFile) ToYaml(w io.Writer) error {
+	var err error
+	return err
+}
+
 type Stmt interface {
 	ToYaml(w io.Writer) error
 }
@@ -36,6 +41,7 @@ var g_dispatch = map[string]ParseFunc{
 	"macro":           parseMacro,
 	"macro_append":    parseMacroAppend,
 	"macro_prepend":   parseMacroPrepend,
+	"macro_remove":    parseMacroRemove,
 	"private":         parsePrivate,
 	"end_private":     parseEndPrivate,
 	"public":          parsePublic,
@@ -200,6 +206,31 @@ func parseMacroPrepend(p *Parser) error {
 	var err error
 	tokens := p.tokens
 	vv := MacroPrepend{Name: tokens[1]}
+	vv.Value = make(map[string]string)
+	vv.Value["default"] = tokens[2]
+	if len(tokens) > 3 {
+		toks := tokens[3:]
+		for i := 0; i+1 < len(toks); i += 2 {
+			vv.Value[toks[i]] = toks[i+1]
+		}
+	}
+	p.req.Stmts = append(p.req.Stmts, &vv)
+	return err
+}
+
+type MacroRemove struct {
+	Name  string
+	Value map[string]string
+}
+
+func (s *MacroRemove) ToYaml(w io.Writer) error {
+	return nil
+}
+
+func parseMacroRemove(p *Parser) error {
+	var err error
+	tokens := p.tokens
+	vv := MacroRemove{Name: tokens[1]}
 	vv.Value = make(map[string]string)
 	vv.Value["default"] = tokens[2]
 	if len(tokens) > 3 {
