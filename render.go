@@ -3,14 +3,18 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/hwaf/hwaf/hlib"
 )
 
 type Renderer struct {
 	req     *ReqFile
 	wscript bool
 	w       *os.File
+	pkg     hlib.Wscript_t
 }
 
 func NewRenderer(req *ReqFile) (*Renderer, error) {
@@ -36,6 +40,77 @@ func (r *Renderer) Render() error {
 
 func (r *Renderer) analyze() error {
 	var err error
+
+	basedir := filepath.Dir(filepath.Dir(r.req.Filename))
+
+	wscript := hlib.Wscript_t{
+		Package:   hlib.Package_t{Name: basedir},
+		Configure: hlib.Configure_t{Env: make(hlib.Env_t)},
+		Build: hlib.Build_t{Env: make(hlib.Env_t)},
+	}
+
+	// targets
+	apps := make(map[string]*Application)
+	libs := make(map[string]*Library)
+	
+	// first pass: discover targets
+	for _, stmt := range r.req.Stmts {
+		switch stmt.(type) {
+		case *Application:
+			x := stmt.(*Application)
+			apps[x.Name] = x
+
+		case *Library:
+			x := stmt.(*Library)
+			libs[x.Name] = x
+		}
+	}
+	fmt.Printf("foo=%s\n", wscript.Package.Name)
+
+	// second pass to collect
+	for _, stmt := range r.req.Stmts {
+		wpkg := &wscript.Package
+		wbld := &wscript.Build
+		//wcfg := &wscript.Configure
+		switch x := stmt.(type) {
+		case *Author:
+			wpkg.Authors = append(wpkg.Authors, x.Name)
+		case *Manager:
+			wpkg.Managers = append(wpkg.Managers, x.Name)
+		case *Version:
+			wpkg.Version = x.Value
+		case *UsePkg:
+			deptype := hlib.PrivateDep
+			if !x.IsPrivate {
+				deptype = hlib.PublicDep
+			}
+			if str_is_in_slice(x.Switches, "-no_auto_imports") {
+				deptype |= hlib.RuntimeDep
+			}
+			wpkg.Deps = append(
+				wpkg.Deps, 
+				hlib.Dep_t{
+					Name: path.Join(x.Path, x.Package),
+					Version: x.Version,
+					Type: deptype,
+				},
+			)
+			
+		case *Library:
+			tgt := hlib.Target_t{Name: x.Name}
+			srcs, rest := sanitize_srcs(x.Source)
+			// FIXME: handle -s=some/dir
+			if len(rest) > 0 {
+			}
+			val := hlib.Value{Name: x.Name, Default:srcs}
+			tgt.Source = append(tgt.Source, val)
+			if features, ok := g_profile.features["library"]; ok {
+				tgt.Features = features
+			}
+			wbld.Targets = append(wbld.Targets, tgt)
+		}
+	}
+
 	for _, stmt := range r.req.Stmts {
 		switch stmt.(type) {
 		case *PathRemove, *MakeFragment, *Pattern:
