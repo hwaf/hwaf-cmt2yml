@@ -1,8 +1,9 @@
 package main
 
 import (
-	"strings"
 	"os"
+	"regexp"
+	"strings"
 )
 
 func path_exists(name string) bool {
@@ -34,6 +35,17 @@ func str_split(s, sep string) []string {
 func str_is_in_slice(slice []string, str string) bool {
 	for _, s := range slice {
 		if s == str {
+			return true
+		}
+	}
+	return false
+}
+
+// re_is_in_slice_suffix returns true if an element in the given slice of strings is a prefix of value.
+func re_is_in_slice_suffix(slice []string, macro, pattern string) bool {
+	for _, s := range slice {
+		pat := regexp.MustCompile(s + pattern)
+		if pat.MatchString(macro) {
 			return true
 		}
 	}

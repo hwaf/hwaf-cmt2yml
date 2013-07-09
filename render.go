@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/hwaf/hwaf/hlib"
@@ -43,16 +44,17 @@ func (r *Renderer) analyze() error {
 
 	basedir := filepath.Dir(filepath.Dir(r.req.Filename))
 
-	wscript := hlib.Wscript_t{
+	r.pkg = hlib.Wscript_t{
 		Package:   hlib.Package_t{Name: basedir},
 		Configure: hlib.Configure_t{Env: make(hlib.Env_t)},
-		Build: hlib.Build_t{Env: make(hlib.Env_t)},
+		Build:     hlib.Build_t{Env: make(hlib.Env_t)},
 	}
+	wscript := &r.pkg
 
 	// targets
 	apps := make(map[string]*Application)
 	libs := make(map[string]*Library)
-	
+
 	// first pass: discover targets
 	for _, stmt := range r.req.Stmts {
 		switch stmt.(type) {
@@ -65,20 +67,68 @@ func (r *Renderer) analyze() error {
 			libs[x.Name] = x
 		}
 	}
-	fmt.Printf("foo=%s\n", wscript.Package.Name)
 
-	// second pass to collect
+	// list of macros related to targets.
+	// this will be used to:
+	//  - fold them together
+	//  - pre-process macro_append, macro_remove, ...
+	//  - dispatch to wscript equivalents. e.g.:
+	//     - <name>linkopts -> ctx(use=[...], cxxshlibflags=[...])
+	//     - <name>_dependencies -> ctx(depends_on=[...])
+	//     - includes -> ctx(includes=[..])
+	macros := make(map[string][]Stmt)
+
+	tgt_names := make([]string, 0, len(apps)+len(libs))
+	for k, _ := range apps {
+		tgt_names = append(tgt_names, k)
+	}
+	for k, _ := range libs {
+		tgt_names = append(tgt_names, k)
+	}
+	sort.Strings(tgt_names)
+
+	//fmt.Printf("+++ tgt_names: %v\n", tgt_names)
+
+	// second pass: collect macros
+	for _, stmt := range r.req.Stmts {
+		switch x := stmt.(type) {
+		default:
+			continue
+		case *Macro:
+			//fmt.Printf("== [%s] ==\n", x.Name)
+			//pat := x.Name+"(_dependencies|linkopts)"
+			pat := ".*?"
+			if !re_is_in_slice_suffix(tgt_names, x.Name, pat) {
+				continue
+			}
+			macros[x.Name] = append(macros[x.Name], x)
+
+		case *MacroAppend:
+			pat := ".*?"
+			if !re_is_in_slice_suffix(tgt_names, x.Name, pat) {
+				continue
+			}
+			macros[x.Name] = append(macros[x.Name], x)
+
+		}
+	}
+
+	// third pass to collect
 	for _, stmt := range r.req.Stmts {
 		wpkg := &wscript.Package
 		wbld := &wscript.Build
-		//wcfg := &wscript.Configure
+		wcfg := &wscript.Configure
 		switch x := stmt.(type) {
+
 		case *Author:
 			wpkg.Authors = append(wpkg.Authors, x.Name)
+
 		case *Manager:
 			wpkg.Managers = append(wpkg.Managers, x.Name)
+
 		case *Version:
 			wpkg.Version = x.Value
+
 		case *UsePkg:
 			deptype := hlib.PrivateDep
 			if !x.IsPrivate {
@@ -88,26 +138,75 @@ func (r *Renderer) analyze() error {
 				deptype |= hlib.RuntimeDep
 			}
 			wpkg.Deps = append(
-				wpkg.Deps, 
+				wpkg.Deps,
 				hlib.Dep_t{
-					Name: path.Join(x.Path, x.Package),
+					Name:    path.Join(x.Path, x.Package),
 					Version: x.Version,
-					Type: deptype,
+					Type:    deptype,
 				},
 			)
-			
+
 		case *Library:
 			tgt := hlib.Target_t{Name: x.Name}
 			srcs, rest := sanitize_srcs(x.Source)
 			// FIXME: handle -s=some/dir
 			if len(rest) > 0 {
 			}
-			val := hlib.Value{Name: x.Name, Default:srcs}
+			val := hlib.Value{Name: x.Name, Default: srcs}
 			tgt.Source = append(tgt.Source, val)
 			if features, ok := g_profile.features["library"]; ok {
 				tgt.Features = features
 			}
 			wbld.Targets = append(wbld.Targets, tgt)
+
+		case *Application:
+			tgt := hlib.Target_t{Name: x.Name}
+			srcs, rest := sanitize_srcs(x.Source)
+			// FIXME: handle -s=some/dir
+			if len(rest) > 0 {
+			}
+			val := hlib.Value{Name: x.Name, Default: srcs}
+			tgt.Source = append(tgt.Source, val)
+			if features, ok := g_profile.features["application"]; ok {
+				tgt.Features = features
+			}
+			wbld.Targets = append(wbld.Targets, tgt)
+
+		case *Macro:
+			if _, ok := macros[x.Name]; ok {
+				// this will be used by a library or application
+				continue
+			}
+			val := hlib_value_from(x.Value)
+			val.Name = x.Name
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.MacroStmt{Value: val})
+
+		case *MacroAppend:
+			if _, ok := macros[x.Name]; ok {
+				// this will be used by a library or application
+				continue
+			}
+			val := hlib_value_from(x.Value)
+			val.Name = x.Name
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.MacroAppendStmt{Value: val})
+
+		case *MacroRemove:
+			if _, ok := macros[x.Name]; ok {
+				// this will be used by a library or application
+				continue
+			}
+			panic("macro_remove: not a real CMT statement!")
+			//val := hlib.Value{Name: x.Name}
+			//wcfg.Stmts = append(wcfg.Stmts, &hlib.MacroRemoveStmt{Value: val})
+
+		case *Path:
+		case *PathAppend:
+		case *PathRemove:
+
+		case *Pattern:
+		case *ApplyPattern:
+		case *MakeFragment:
+
 		}
 	}
 
@@ -118,6 +217,7 @@ func (r *Renderer) analyze() error {
 			return nil
 		}
 	}
+
 	return err
 }
 
@@ -223,6 +323,35 @@ func init_env_map_from(env henv_t, key string) map[string]interface{} {
 		}
 	}
 	return vv
+}
+
+func hlib_value_from(value map[string]string) hlib.Value {
+	hvalue := hlib.Value{}
+	if _, ok := value["default"]; ok {
+		vals := strings.Split(value["default"], " ")
+		for _, vv := range vals {
+			vv = strings.Trim(vv, " \t")
+			if len(vv) > 0 {
+				hvalue.Default = append(hvalue.Default, vv)
+			}
+		}
+	}
+	for k, v := range value {
+		if k == "default" {
+			continue
+		}
+		kv := hlib.KeyValue{Tag: k}
+		vals := strings.Split(v, " ")
+		for _, vv := range vals {
+			vv = strings.Trim(vv, " \t")
+			if len(vv) > 0 {
+				kv.Value = append(kv.Value, vv)
+			}
+		}
+		hvalue.Set = append(hvalue.Set, kv)
+	}
+
+	return hvalue
 }
 
 // EOF

@@ -183,7 +183,8 @@ PACKAGE = {
 ### ---------------------------------------------------------------------------
 def pkg_deps(ctx):
     {{with .Deps}}## public dependencies
-    {{if .Public}}{{range .Public}}ctx.use_pkg("{{.}}", public=True){{end}}{{else}}## => none{{end}}
+    {{if .Public}}{{range .Public}}ctx.use_pkg("{{.}}", public=True)
+    {{end}}{{else}}## => none{{end}}
 
     ## private dependencies
     {{if .Private}}{{range .Private}}ctx.use_pkg("{{.}}", private=True){{end}}{{else}}## => none{{end}}
