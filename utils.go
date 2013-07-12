@@ -4,6 +4,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/hwaf/hwaf/hlib"
 )
 
 func path_exists(name string) bool {
@@ -50,6 +52,78 @@ func re_is_in_slice_suffix(slice []string, macro, pattern string) bool {
 		}
 	}
 	return false
+}
+
+func hlib_value_from(value map[string]string) hlib.Value {
+	hvalue := hlib.Value{}
+	if _, ok := value["default"]; ok {
+		vals := strings.Split(value["default"], " ")
+		def_value := make([]string, 0, len(vals))
+		for _, vv := range vals {
+			vv = strings.Trim(vv, " \t")
+			if len(vv) > 0 {
+				def_value = append(def_value, vv)
+			}
+		}
+		hvalue.Set = append(hvalue.Set,
+			hlib.KeyValue{
+				Tag:   "default",
+				Value: def_value,
+			},
+		)
+	}
+	for k, v := range value {
+		if k == "default" {
+			continue
+		}
+		kv := hlib.KeyValue{Tag: k}
+		vals := strings.Split(v, " ")
+		for _, vv := range vals {
+			vv = strings.Trim(vv, " \t")
+			if len(vv) > 0 {
+				kv.Value = append(kv.Value, vv)
+			}
+		}
+		hvalue.Set = append(hvalue.Set, kv)
+	}
+
+	return hvalue
+}
+
+func hlib_value_from_slice(name string, values []string) hlib.Value {
+	hvalue := hlib.Value{Name: name}
+	{
+		dft := values[0]
+		vals := strings.Split(dft, " ")
+		kv := hlib.KeyValue{Tag: "default",
+			Value: make([]string, 0, len(vals)),
+		}
+		for _, vv := range vals {
+			vv = strings.Trim(vv, " \t")
+			if len(vv) > 0 {
+				kv.Value = append(kv.Value, vv)
+			}
+		}
+		hvalue.Set = append(hvalue.Set, kv)
+	}
+	if len(values) > 1 {
+		toks := values[1:]
+		for i := 0; i+1 < len(toks); i += 2 {
+			k := toks[i]
+			v := toks[i+1]
+
+			kv := hlib.KeyValue{Tag: k}
+			vals := strings.Split(v, " ")
+			for _, vv := range vals {
+				vv = strings.Trim(vv, " \t")
+				if len(vv) > 0 {
+					kv.Value = append(kv.Value, vv)
+				}
+			}
+			hvalue.Set = append(hvalue.Set, kv)
+		}
+	}
+	return hvalue
 }
 
 // EOF

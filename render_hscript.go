@@ -101,54 +101,54 @@ func make_target_from(req *ReqFile, stmt Stmt) htarget_t {
 
 	type mungefct_t func(s string) string
 
-	linkopts_munge := func(s string) string {
-		if strings.HasPrefix(s, "-l") {
-			s = s[len("-l"):]
-		}
-		return s
-	}
-	defines_munge := func(s string) string {
-		if strings.HasPrefix(s, "-D") {
-			s = s[len("-D"):]
-		}
-		return s
-	}
+	// linkopts_munge := func(s string) string {
+	// 	if strings.HasPrefix(s, "-l") {
+	// 		s = s[len("-l"):]
+	// 	}
+	// 	return s
+	// }
+	// defines_munge := func(s string) string {
+	// 	if strings.HasPrefix(s, "-D") {
+	// 		s = s[len("-D"):]
+	// 	}
+	// 	return s
+	// }
 
-	massage := func(values [][2]string, mungers []mungefct_t) []string {
-		out := make([]string, 0, len(values))
+	// massage := func(values [][2]string, mungers []mungefct_t) []string {
+	// 	out := make([]string, 0, len(values))
 
-		switch len(values) {
-		case 1:
-			vv := str_split(values[0][1], " ")
-			for ii := range vv {
-				for _, munger := range mungers {
-					vv[ii] = munger(vv[ii])
-				}
-				vv[ii] = strings.Replace(vv[ii], "$(", "${", -1)
-				vv[ii] = strings.Replace(vv[ii], ")", "}", -1)
-			}
-			out = append(out, vv...)
-		default:
-			for _, v := range values {
-				vv := strings.Trim(v[1], " \t")
-				if len(vv) == 0 {
-					continue
-				}
-				vvv := str_split(vv, " ")
-				for ii := range vvv {
-					for _, munger := range mungers {
-						vvv[ii] = munger(vvv[ii])
-					}
-					vvv[ii] = strings.Replace(vvv[ii], "$(", "${", -1)
-					vvv[ii] = strings.Replace(vvv[ii], ")", "}", -1)
-				}
-				out = append(out,
-					fmt.Sprintf("{%s: [%s]}", v[0], w_py_strlist(vvv)),
-				)
-			}
-		}
-		return out
-	}
+	// 	switch len(values) {
+	// 	case 1:
+	// 		vv := str_split(values[0][1], " ")
+	// 		for ii := range vv {
+	// 			for _, munger := range mungers {
+	// 				vv[ii] = munger(vv[ii])
+	// 			}
+	// 			vv[ii] = strings.Replace(vv[ii], "$(", "${", -1)
+	// 			vv[ii] = strings.Replace(vv[ii], ")", "}", -1)
+	// 		}
+	// 		out = append(out, vv...)
+	// 	default:
+	// 		for _, v := range values {
+	// 			vv := strings.Trim(v[1], " \t")
+	// 			if len(vv) == 0 {
+	// 				continue
+	// 			}
+	// 			vvv := str_split(vv, " ")
+	// 			for ii := range vvv {
+	// 				for _, munger := range mungers {
+	// 					vvv[ii] = munger(vvv[ii])
+	// 				}
+	// 				vvv[ii] = strings.Replace(vvv[ii], "$(", "${", -1)
+	// 				vvv[ii] = strings.Replace(vvv[ii], ")", "}", -1)
+	// 			}
+	// 			out = append(out,
+	// 				fmt.Sprintf("{%s: [%s]}", v[0], w_py_strlist(vvv)),
+	// 			)
+	// 		}
+	// 	}
+	// 	return out
+	// }
 
 	for _, s := range req.Stmts {
 		switch s.(type) {
@@ -157,32 +157,7 @@ func make_target_from(req *ReqFile, stmt Stmt) htarget_t {
 			if !strings.HasPrefix(x.Name, tgt.Name) {
 				continue
 			}
-			values := make([][2]string, 0, len(x.Value))
-			for k, v := range x.Value {
-				values = append(values, [2]string{k, v})
-			}
-
-			if len(values) == 0 {
-				continue
-			}
-
-			switch x.Name {
-			case tgt.Name + "_dependencies":
-				tgt.Depends = append(tgt.Depends, massage(values, nil)...)
-
-			case tgt.Name + "linkopts":
-				tgt.Use = append(tgt.Use, massage(values, []mungefct_t{linkopts_munge})...)
-
-			case tgt.Name + "_cflags":
-				tgt.Defines = append(tgt.Defines, massage(values, []mungefct_t{defines_munge})...)
-
-			case tgt.Name + "_cxxflags":
-				tgt.Defines = append(tgt.Defines, massage(values, []mungefct_t{defines_munge})...)
-
-			case tgt.Name + "_shlibflags":
-				tgt.Use = append(tgt.Use, massage(values, []mungefct_t{linkopts_munge})...)
-
-			}
+			// FIXME
 		}
 	}
 	return tgt
@@ -279,16 +254,16 @@ func (r *Renderer) render_hscript() error {
 				// handled elsewhere
 				continue
 			}
-
-			fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			vv := init_env_map_from(hcfg.Env, p.Name)
-			for tag, v := range p.Value {
-				v = sanitize_env_string(v)
-				vv[tag] = v
-			}
-			if len(vv) > 0 {
-				hcfg.Env[p.Name] = vv
-			}
+			// FIXME
+			// fmt.Printf("--- %q %v\n", p.Name, p.Value)
+			// vv := init_env_map_from(hcfg.Env, p.Name)
+			// for tag, v := range p.Value {
+			// 	v = sanitize_env_string(v)
+			// 	vv[tag] = v
+			// }
+			// if len(vv) > 0 {
+			// 	hcfg.Env[p.Name] = vv
+			// }
 		}
 
 		if p, ok := stmt.(*MacroAppend); ok {
@@ -297,140 +272,144 @@ func (r *Renderer) render_hscript() error {
 				continue
 			}
 			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			vv := init_env_map_from(hcfg.Env, p.Name)
-			for tag, v := range p.Value {
-				v = sanitize_env_string(v)
-				v = strings.Trim(v, " ")
-				if _, haskey := vv[tag]; haskey {
-					old := vv[tag]
-					//fmt.Printf("--> %q\n", old)
-					switch old.(type) {
-					case string:
-						old := old.(string)
-						if old == "" && v == "" {
-							// no-op
-						} else if old != "" && v == "" {
-							vv[tag] = old
-						} else if old == "" && v != "" {
-							vv[tag] = v
-						} else {
-							vv[tag] = []string{old, v}
-						}
-					case []string:
-						old := old.([]string)
-						if v != "" {
-							val := make([]string, len(old)+1)
-							copy(val, old)
-							val = append(val, v)
-							vv[tag] = val
-						}
-					}
-
-				} else {
-					if v == "" {
-						// no-op
-					} else {
-						vv[tag] = []string{fmt.Sprintf("${%s}", p.Name), v}
-					}
-				}
-			}
-			if len(vv) > 0 {
-				hcfg.Env[p.Name] = vv
-			}
+			// FIXME
+			// vv := init_env_map_from(hcfg.Env, p.Name)
+			// for tag, v := range p.Value {
+			// 	v = sanitize_env_string(v)
+			// 	v = strings.Trim(v, " ")
+			// 	if _, haskey := vv[tag]; haskey {
+			// 		old := vv[tag]
+			// 		//fmt.Printf("--> %q\n", old)
+			// 		switch old.(type) {
+			// 		case string:
+			// 			old := old.(string)
+			// 			if old == "" && v == "" {
+			// 				// no-op
+			// 			} else if old != "" && v == "" {
+			// 				vv[tag] = old
+			// 			} else if old == "" && v != "" {
+			// 				vv[tag] = v
+			// 			} else {
+			// 				vv[tag] = []string{old, v}
+			// 			}
+			// 		case []string:
+			// 			old := old.([]string)
+			// 			if v != "" {
+			// 				val := make([]string, len(old)+1)
+			// 				copy(val, old)
+			// 				val = append(val, v)
+			// 				vv[tag] = val
+			// 			}
+			// 		}
+			//
+			// 	} else {
+			// 		if v == "" {
+			// 			// no-op
+			// 		} else {
+			// 			vv[tag] = []string{fmt.Sprintf("${%s}", p.Name), v}
+			// 		}
+			// 	}
+			// }
+			// if len(vv) > 0 {
+			// 	hcfg.Env[p.Name] = vv
+			// }
 		}
 
-		if p, ok := stmt.(*PathAppend); ok {
+		if _ /*p*/, ok := stmt.(*PathAppend); ok {
 			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			vv := init_env_map_from(hcfg.Env, p.Name)
-			for tag, v := range p.Value {
-				v = sanitize_env_string(v)
-				if _, haskey := vv[tag]; haskey {
-					old := vv[tag]
-					//fmt.Printf("--> %q\n", old)
-					if old == "" && v == "" {
-						// no-op
-					} else if old != "" && v == "" {
-						vv[tag] = old
-					} else if old == "" && v != "" {
-						vv[tag] = v
-					} else {
-						vv[tag] = fmt.Sprintf("%s:%s", old, v)
-					}
-
-				} else {
-					if v == "" {
-						vv[tag] = fmt.Sprintf("${%s}", p.Name)
-					} else {
-						vv[tag] = fmt.Sprintf("${%s}:%s", p.Name, v)
-					}
-				}
-			}
-			if len(vv) > 0 {
-				hcfg.Env[p.Name] = vv
-			}
+			// FIXME
+			// vv := init_env_map_from(hcfg.Env, p.Name)
+			// for tag, v := range p.Value {
+			// 	v = sanitize_env_string(v)
+			// 	if _, haskey := vv[tag]; haskey {
+			// 		old := vv[tag]
+			// 		//fmt.Printf("--> %q\n", old)
+			// 		if old == "" && v == "" {
+			// 			// no-op
+			// 		} else if old != "" && v == "" {
+			// 			vv[tag] = old
+			// 		} else if old == "" && v != "" {
+			// 			vv[tag] = v
+			// 		} else {
+			// 			vv[tag] = fmt.Sprintf("%s:%s", old, v)
+			// 		}
+			//
+			// 	} else {
+			// 		if v == "" {
+			// 			vv[tag] = fmt.Sprintf("${%s}", p.Name)
+			// 		} else {
+			// 			vv[tag] = fmt.Sprintf("${%s}:%s", p.Name, v)
+			// 		}
+			// 	}
+			// }
+			// if len(vv) > 0 {
+			// 	hcfg.Env[p.Name] = vv
+			// }
 		}
 
-		if p, ok := stmt.(*PathRemove); ok {
+		if _ /*p*/, ok := stmt.(*PathRemove); ok {
 			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
 			continue
-
-			vv := init_env_map_from(hcfg.Env, p.Name)
-			for tag, v := range p.Value {
-				v = sanitize_env_string(v)
-				if _, haskey := vv[tag]; haskey {
-					old := vv[tag]
-					//fmt.Printf("--> %q\n", old)
-					vv[tag] = fmt.Sprintf("%s:%s", old, v)
-
-				} else {
-					if v == "" {
-						vv[tag] = fmt.Sprintf("${%s}", p.Name)
-					} else {
-						vv[tag] = fmt.Sprintf("${%s}:%s", p.Name, v)
-					}
-				}
-			}
-			if len(vv) > 0 {
-				hcfg.Env[p.Name] = vv
-			}
+			// FIXME
+			// vv := init_env_map_from(hcfg.Env, p.Name)
+			// for tag, v := range p.Value {
+			// 	v = sanitize_env_string(v)
+			// 	if _, haskey := vv[tag]; haskey {
+			// 		old := vv[tag]
+			// 		//fmt.Printf("--> %q\n", old)
+			// 		vv[tag] = fmt.Sprintf("%s:%s", old, v)
+			//
+			// 	} else {
+			// 		if v == "" {
+			// 			vv[tag] = fmt.Sprintf("${%s}", p.Name)
+			// 		} else {
+			// 			vv[tag] = fmt.Sprintf("${%s}:%s", p.Name, v)
+			// 		}
+			// 	}
+			// }
+			// if len(vv) > 0 {
+			// 	hcfg.Env[p.Name] = vv
+			// }
 		}
 
-		if p, ok := stmt.(*PathPrepend); ok {
+		if _ /*p*/, ok := stmt.(*PathPrepend); ok {
 			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			vv := init_env_map_from(hcfg.Env, p.Name)
-			for tag, v := range p.Value {
-				v = sanitize_env_string(v)
-				if _, haskey := vv[tag]; haskey {
-					old := vv[tag]
-					//fmt.Printf("--> %q\n", old)
-					if old == "" && v == "" {
-						// no-op
-					} else if old != "" && v == "" {
-						vv[tag] = old
-					} else if old == "" && v != "" {
-						vv[tag] = v
-					} else {
-						vv[tag] = fmt.Sprintf("%s:%s", v, old)
-					}
-				} else {
-					if v == "" {
-						vv[tag] = fmt.Sprintf("${%s}", p.Name)
-					} else {
-						vv[tag] = fmt.Sprintf("%s:${%s}", v, p.Name)
-					}
-				}
-			}
-			if len(vv) > 0 {
-				hcfg.Env[p.Name] = vv
-			}
+			// FIXME
+			// vv := init_env_map_from(hcfg.Env, p.Name)
+			// for tag, v := range p.Value {
+			// 	v = sanitize_env_string(v)
+			// 	if _, haskey := vv[tag]; haskey {
+			// 		old := vv[tag]
+			// 		//fmt.Printf("--> %q\n", old)
+			// 		if old == "" && v == "" {
+			// 			// no-op
+			// 		} else if old != "" && v == "" {
+			// 			vv[tag] = old
+			// 		} else if old == "" && v != "" {
+			// 			vv[tag] = v
+			// 		} else {
+			// 			vv[tag] = fmt.Sprintf("%s:%s", v, old)
+			// 		}
+			// 	} else {
+			// 		if v == "" {
+			// 			vv[tag] = fmt.Sprintf("${%s}", p.Name)
+			// 		} else {
+			// 			vv[tag] = fmt.Sprintf("%s:${%s}", v, p.Name)
+			// 		}
+			// 	}
+			// }
+			// if len(vv) > 0 {
+			// 	hcfg.Env[p.Name] = vv
+			// }
 		}
 
 		if p, ok := stmt.(*SetEnv); ok {
 			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
 			vv := init_env_map_from(hcfg.Env, p.Name)
-			for tag, v := range p.Value {
-				v = sanitize_env_string(v)
-				vv[tag] = v
+			for _, v := range p.Set {
+				tag := v.Tag
+				val := sanitize_env_strings(v.Value)
+				vv[tag] = val
 			}
 			if len(vv) > 0 {
 				hcfg.Env[p.Name] = vv

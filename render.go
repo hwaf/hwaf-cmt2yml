@@ -121,13 +121,13 @@ func (r *Renderer) analyze() error {
 		switch x := stmt.(type) {
 
 		case *Author:
-			wpkg.Authors = append(wpkg.Authors, x.Name)
+			wpkg.Authors = append(wpkg.Authors, hlib.Author(x.Name))
 
 		case *Manager:
-			wpkg.Managers = append(wpkg.Managers, x.Name)
+			wpkg.Managers = append(wpkg.Managers, hlib.Manager(x.Name))
 
 		case *Version:
-			wpkg.Version = x.Value
+			wpkg.Version = hlib.Version(x.Value)
 
 		case *UsePkg:
 			deptype := hlib.PrivateDep
@@ -152,7 +152,12 @@ func (r *Renderer) analyze() error {
 			// FIXME: handle -s=some/dir
 			if len(rest) > 0 {
 			}
-			val := hlib.Value{Name: x.Name, Default: srcs}
+			val := hlib.Value{
+				Name: x.Name,
+				Set: []hlib.KeyValue{
+					{Tag: "default", Value: srcs},
+				},
+			}
 			tgt.Source = append(tgt.Source, val)
 			if features, ok := g_profile.features["library"]; ok {
 				tgt.Features = features
@@ -165,7 +170,12 @@ func (r *Renderer) analyze() error {
 			// FIXME: handle -s=some/dir
 			if len(rest) > 0 {
 			}
-			val := hlib.Value{Name: x.Name, Default: srcs}
+			val := hlib.Value{
+				Name: x.Name,
+				Set: []hlib.KeyValue{
+					{Tag: "default", Value: srcs},
+				},
+			}
 			tgt.Source = append(tgt.Source, val)
 			if features, ok := g_profile.features["application"]; ok {
 				tgt.Features = features
@@ -177,8 +187,7 @@ func (r *Renderer) analyze() error {
 				// this will be used by a library or application
 				continue
 			}
-			val := hlib_value_from(x.Value)
-			val.Name = x.Name
+			val := hlib.Value(*x)
 			wcfg.Stmts = append(wcfg.Stmts, &hlib.MacroStmt{Value: val})
 
 		case *MacroAppend:
@@ -186,8 +195,7 @@ func (r *Renderer) analyze() error {
 				// this will be used by a library or application
 				continue
 			}
-			val := hlib_value_from(x.Value)
-			val.Name = x.Name
+			val := hlib.Value(*x)
 			wcfg.Stmts = append(wcfg.Stmts, &hlib.MacroAppendStmt{Value: val})
 
 		case *MacroRemove:
@@ -195,12 +203,17 @@ func (r *Renderer) analyze() error {
 				// this will be used by a library or application
 				continue
 			}
-			panic("macro_remove: not a real CMT statement!")
-			//val := hlib.Value{Name: x.Name}
-			//wcfg.Stmts = append(wcfg.Stmts, &hlib.MacroRemoveStmt{Value: val})
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.MacroRemoveStmt{Value: val})
 
 		case *Path:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.PathStmt{Value: val})
+
 		case *PathAppend:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.PathAppendStmt{Value: val})
+
 		case *PathRemove:
 
 		case *Pattern:
@@ -303,16 +316,24 @@ func sanitize_env_string(v string) string {
 	return v
 }
 
+func sanitize_env_strings(v []string) string {
+	o := make([]string, 0, len(v))
+	for _, vv := range v {
+		vv = sanitize_env_string(vv)
+		o = append(o, vv)
+	}
+	return strings.Join(o, " ")
+}
+
 func init_env_map_from(env henv_t, key string) map[string]interface{} {
 	vv := map[string]interface{}{}
 	old, haskey := env[key]
 	if haskey {
-		switch old.(type) {
+		switch old := old.(type) {
 		case string:
 			vv["default"] = old
 			panic("boo")
 		case map[string]interface{}:
-			old := env[key].(map[string]interface{})
 			for k, _ := range old {
 				vk := sanitize_env_string(k)
 				vk = strings.Trim(vk, " ")
@@ -323,35 +344,6 @@ func init_env_map_from(env henv_t, key string) map[string]interface{} {
 		}
 	}
 	return vv
-}
-
-func hlib_value_from(value map[string]string) hlib.Value {
-	hvalue := hlib.Value{}
-	if _, ok := value["default"]; ok {
-		vals := strings.Split(value["default"], " ")
-		for _, vv := range vals {
-			vv = strings.Trim(vv, " \t")
-			if len(vv) > 0 {
-				hvalue.Default = append(hvalue.Default, vv)
-			}
-		}
-	}
-	for k, v := range value {
-		if k == "default" {
-			continue
-		}
-		kv := hlib.KeyValue{Tag: k}
-		vals := strings.Split(v, " ")
-		for _, vv := range vals {
-			vv = strings.Trim(vv, " \t")
-			if len(vv) > 0 {
-				kv.Value = append(kv.Value, vv)
-			}
-		}
-		hvalue.Set = append(hvalue.Set, kv)
-	}
-
-	return hvalue
 }
 
 // EOF

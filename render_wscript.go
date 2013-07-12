@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/hwaf/hwaf/hlib"
 )
 
 type wscript_t struct {
@@ -296,77 +298,66 @@ func w_gen_valdict_switch_str(indent string, values [][2]string) string {
 	return strings.Join(o, "\n")
 }
 
+func w_py_hlib_value(indent string, fctname string, x hlib.Value) []string {
+	str := make([]string, 0)
+
+	values := make([][2]string, 0, len(x.Set))
+	for _, v := range x.Set {
+		k := v.Tag
+		values = append(values, [2]string{k, w_py_strlist(v.Value)})
+	}
+	str = append(
+		str,
+		fmt.Sprintf(
+			"ctx.%s(%q, %s)",
+			fctname,
+			x.Name,
+			w_gen_valdict_switch_str(indent, values),
+		),
+	)
+
+	return str
+}
+
 func gen_wscript_stmts(stmt Stmt) string {
 	const indent = "    "
 	var str []string
-	switch stmt.(type) {
+	switch xx := stmt.(type) {
 	case *Macro:
 		str = []string{fmt.Sprintf("## macro %v", stmt)}
-		x := stmt.(*Macro)
-		values := make([][2]string, 0, len(x.Value))
-		for k, v := range x.Value {
-			values = append(values, [2]string{k, v})
-		}
+		x := hlib.Value(*xx)
 		str = append(
 			str,
-			fmt.Sprintf(
-				"ctx.hwaf_declare_macro(%q, %s)",
-				x.Name,
-				w_gen_valdict_switch_str(indent, values),
-			),
+			w_py_hlib_value(indent, "hwaf_declare_macro", x)...,
 		)
 
 	case *MacroAppend:
 		str = []string{fmt.Sprintf("## macro_append %v", stmt)}
-		x := stmt.(*MacroAppend)
-		values := make([][2]string, 0, len(x.Value))
-		for k, v := range x.Value {
-			values = append(values, [2]string{k, v})
-		}
+		x := hlib.Value(*xx)
 		str = append(
 			str,
-			fmt.Sprintf(
-				"ctx.hwaf_macro_append(%q, %s)",
-				x.Name,
-				w_gen_valdict_switch_str(indent, values),
-			),
+			w_py_hlib_value(indent, "hwaf_macro_append", x)...,
 		)
 
 	case *MacroPrepend:
 		str = []string{fmt.Sprintf("## macro_prepend %v", stmt)}
-		x := stmt.(*MacroPrepend)
-		values := make([][2]string, 0, len(x.Value))
-		for k, v := range x.Value {
-			values = append(values, [2]string{k, v})
-		}
+		x := hlib.Value(*xx)
 		str = append(
 			str,
-			fmt.Sprintf(
-				"ctx.hwaf_macro_prepend(%q, %s)",
-				x.Name,
-				w_gen_valdict_switch_str(indent, values),
-			),
+			w_py_hlib_value(indent, "hwaf_macro_prepend", x)...,
 		)
 
 	case *MacroRemove:
 		str = []string{fmt.Sprintf("## macro_remove %v", stmt)}
-		x := stmt.(*MacroRemove)
-		values := make([][2]string, 0, len(x.Value))
-		for k, v := range x.Value {
-			values = append(values, [2]string{k, v})
-		}
+		x := hlib.Value(*xx)
 		str = append(
 			str,
-			fmt.Sprintf(
-				"ctx.hwaf_macro_remove(%q, %s)",
-				x.Name,
-				w_gen_valdict_switch_str(indent, values),
-			),
+			w_py_hlib_value(indent, "hwaf_macro_remove", x)...,
 		)
 
 	case *Tag:
 		str = []string{fmt.Sprintf("## tag %v", stmt)}
-		x := stmt.(*Tag)
+		x := xx
 		values := w_py_strlist(x.Content)
 		str = append(str,
 			"ctx.hwaf_declare_tag(",
@@ -375,52 +366,36 @@ func gen_wscript_stmts(stmt Stmt) string {
 			")",
 		)
 
-	case *PathAppend:
-		str = []string{fmt.Sprintf("## path_append %v", stmt)}
-		x := stmt.(*PathAppend)
-		values := make([][2]string, 0, len(x.Value))
-		for k, v := range x.Value {
-			values = append(values, [2]string{k, v})
-		}
+	case *Path:
+		str = []string{fmt.Sprintf("## path %v", stmt)}
+		x := hlib.Value(*xx)
 		str = append(
 			str,
-			fmt.Sprintf(
-				"ctx.hwaf_path_append(%q, %s)",
-				x.Name,
-				w_gen_valdict_switch_str(indent, values),
-			),
+			w_py_hlib_value(indent, "hwaf_declare_path", x)...,
+		)
+
+	case *PathAppend:
+		str = []string{fmt.Sprintf("## path_append %v", stmt)}
+		x := hlib.Value(*xx)
+		str = append(
+			str,
+			w_py_hlib_value(indent, "hwaf_path_append", x)...,
 		)
 
 	case *PathPrepend:
 		str = []string{fmt.Sprintf("## path_prepend %v", stmt)}
-		x := stmt.(*PathPrepend)
-		values := make([][2]string, 0, len(x.Value))
-		for k, v := range x.Value {
-			values = append(values, [2]string{k, v})
-		}
+		x := hlib.Value(*xx)
 		str = append(
 			str,
-			fmt.Sprintf(
-				"ctx.hwaf_path_prepend(%q, %s)",
-				x.Name,
-				w_gen_valdict_switch_str(indent, values),
-			),
+			w_py_hlib_value(indent, "hwaf_path_prepend", x)...,
 		)
 
 	case *PathRemove:
 		str = []string{fmt.Sprintf("## path_remove %v", stmt)}
-		x := stmt.(*PathRemove)
-		values := make([][2]string, 0, len(x.Value))
-		for k, v := range x.Value {
-			values = append(values, [2]string{k, v})
-		}
+		x := hlib.Value(*xx)
 		str = append(
 			str,
-			fmt.Sprintf(
-				"ctx.hwaf_path_remove(%q, %s)",
-				x.Name,
-				w_gen_valdict_switch_str(indent, values),
-			),
+			w_py_hlib_value(indent, "hwaf_path_remove", x)...,
 		)
 
 	default:
