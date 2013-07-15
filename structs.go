@@ -286,10 +286,7 @@ func parsePattern(p *Parser) error {
 	return err
 }
 
-type ApplyPattern struct {
-	Name string
-	Args []string
-}
+type ApplyPattern hlib.Value
 
 func (s *ApplyPattern) ToYaml(w io.Writer) error {
 	return nil
@@ -301,17 +298,12 @@ func parseApplyPattern(p *Parser) error {
 	if tokens[1][0] == '-' {
 		tokens[1], tokens[2] = tokens[2], tokens[1]
 	}
-	vv := ApplyPattern{Name: tokens[1]}
-	if len(tokens) > 2 {
-		vv.Args = append(vv.Args, tokens[2:]...)
-	}
+	vv := ApplyPattern(hlib_value_from_slice(tokens[1], tokens[2:]))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
 
-type IgnorePattern struct {
-	Name string
-}
+type IgnorePattern hlib.Value
 
 func (s *IgnorePattern) ToYaml(w io.Writer) error {
 	return nil
@@ -320,7 +312,7 @@ func (s *IgnorePattern) ToYaml(w io.Writer) error {
 func parseIgnorePattern(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := IgnorePattern{Name: tokens[1]}
+	vv := IgnorePattern(hlib_value_from_slice(tokens[1], nil))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -381,10 +373,7 @@ func parsePathPrepend(p *Parser) error {
 	return err
 }
 
-type Tag struct {
-	Name    string
-	Content []string
-}
+type Tag hlib.TagStmt
 
 func (s *Tag) ToYaml(w io.Writer) error {
 	return nil
@@ -399,10 +388,7 @@ func parseTag(p *Parser) error {
 	return err
 }
 
-type ApplyTag struct {
-	Name string
-	Args []string
-}
+type ApplyTag hlib.Value
 
 func (s *ApplyTag) ToYaml(w io.Writer) error {
 	return nil
@@ -428,10 +414,7 @@ func parseLibrary(p *Parser) error {
 	return err
 }
 
-type Action struct {
-	Name  string
-	Value map[string]string
-}
+type Action hlib.Value
 
 func (s *Action) ToYaml(w io.Writer) error {
 	return nil
@@ -440,15 +423,7 @@ func (s *Action) ToYaml(w io.Writer) error {
 func parseAction(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := Action{Name: tokens[1]}
-	vv.Value = make(map[string]string)
-	vv.Value["default"] = tokens[2]
-	if len(tokens) > 3 {
-		toks := tokens[3:]
-		for i := 0; i+1 < len(toks); i += 2 {
-			vv.Value[toks[i]] = toks[i+1]
-		}
-	}
+	vv := Action(hlib_value_from_slice(tokens[1], tokens[2:]))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -513,9 +488,7 @@ func parseCmtPathPattern(p *Parser) error {
 	return err
 }
 
-type MakeFragment struct {
-	Name string
-}
+type MakeFragment hlib.MakeFragmentStmt
 
 func (s *MakeFragment) ToYaml(w io.Writer) error {
 	return nil

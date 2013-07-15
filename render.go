@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path"
@@ -110,6 +111,13 @@ func (r *Renderer) analyze() error {
 			}
 			macros[x.Name] = append(macros[x.Name], x)
 
+		case *MacroRemove:
+			pat := ".*?"
+			if !re_is_in_slice_suffix(tgt_names, x.Name, pat) {
+				continue
+			}
+			macros[x.Name] = append(macros[x.Name], x)
+
 		}
 	}
 
@@ -176,6 +184,7 @@ func (r *Renderer) analyze() error {
 					{Tag: "default", Value: srcs},
 				},
 			}
+
 			tgt.Source = append(tgt.Source, val)
 			if features, ok := g_profile.features["application"]; ok {
 				tgt.Features = features
@@ -215,11 +224,26 @@ func (r *Renderer) analyze() error {
 			wcfg.Stmts = append(wcfg.Stmts, &hlib.PathAppendStmt{Value: val})
 
 		case *PathRemove:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.PathRemoveStmt{Value: val})
 
 		case *Pattern:
-		case *ApplyPattern:
-		case *MakeFragment:
+			//val := hlib.Value(*x)
+			//wcfg.Stmts = append(wcfg.Stmts, &hlib.PatternStmt{Value: val})
 
+		case *ApplyPattern:
+			val := hlib.Value(*x)
+			wbld.Stmts = append(wbld.Stmts, &hlib.ApplyPatternStmt{Value: val})
+
+		case *Tag:
+			wcfg.Stmts = append(wcfg.Stmts, (*hlib.TagStmt)(x))
+
+		case *ApplyTag:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.ApplyTagStmt{Value: val})
+
+		case *MakeFragment:
+			wcfg.Stmts = append(wcfg.Stmts, (*hlib.MakeFragmentStmt)(x))
 		}
 	}
 
@@ -274,7 +298,7 @@ func (r *Renderer) render() error {
 	return err
 }
 
-func render_yaml(req *ReqFile) error {
+func render_script(req *ReqFile) error {
 	var err error
 
 	renderer, err := NewRenderer(req)

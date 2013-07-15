@@ -231,6 +231,23 @@ def configure(ctx):
 	)
 	handle_err(err)
 
+	// generate build - section
+	err = w_tmpl(
+		r.w,
+		`
+
+### ---------------------------------------------------------------------------
+def build(ctx):
+    {{range .Tools}}ctx.load("{{.}}")
+    {{end}}
+    {{range .Stmts}}##{{. | gen_wscript_stmts}}
+    {{end}}
+    return # configure
+`,
+		wscript.Build,
+	)
+	handle_err(err)
+
 	_, err = fmt.Fprintf(
 		r.w,
 		"\n## EOF ##\n",

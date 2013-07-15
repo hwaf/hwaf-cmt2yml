@@ -69,7 +69,7 @@ func main() {
 				}
 				return
 			}
-			err = render_yaml(reqfile)
+			err = render_script(reqfile)
 			if err != nil {
 				ch <- Response{
 					reqfile,

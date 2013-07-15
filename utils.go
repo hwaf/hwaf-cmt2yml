@@ -92,7 +92,7 @@ func hlib_value_from(value map[string]string) hlib.Value {
 
 func hlib_value_from_slice(name string, values []string) hlib.Value {
 	hvalue := hlib.Value{Name: name}
-	{
+	if len(values) > 0 {
 		dft := values[0]
 		vals := strings.Split(dft, " ")
 		kv := hlib.KeyValue{Tag: "default",
