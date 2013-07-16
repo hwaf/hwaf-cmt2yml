@@ -183,6 +183,7 @@ func (r *Renderer) analyze() error {
 			if features, ok := g_profile.features["library"]; ok {
 				tgt.Features = features
 			}
+			w_distill_tgt(&tgt, macros)
 			wbld.Targets = append(wbld.Targets, tgt)
 
 		case *Application:
@@ -202,6 +203,7 @@ func (r *Renderer) analyze() error {
 			if features, ok := g_profile.features["application"]; ok {
 				tgt.Features = features
 			}
+			w_distill_tgt(&tgt, macros)
 			wbld.Targets = append(wbld.Targets, tgt)
 
 		case *Macro:
@@ -245,8 +247,7 @@ func (r *Renderer) analyze() error {
 			//wcfg.Stmts = append(wcfg.Stmts, &hlib.PatternStmt{Value: val})
 
 		case *ApplyPattern:
-			val := hlib.Value(*x)
-			wbld.Stmts = append(wbld.Stmts, &hlib.ApplyPatternStmt{Value: val})
+			wbld.Stmts = append(wbld.Stmts, (*hlib.ApplyPatternStmt)(x))
 
 		case *Tag:
 			wcfg.Stmts = append(wcfg.Stmts, (*hlib.TagStmt)(x))
@@ -268,6 +269,18 @@ func (r *Renderer) analyze() error {
 		}
 	}
 
+	// fixups for boost
+	for _, tgt := range wscript.Build.Targets {
+		for _, use := range tgt.Use {
+			for _, kv := range use.Set {
+				for i, vv := range kv.Value {
+					vv = strings.Replace(vv, "-${boost_libsuffix}", "", -1)
+					vv = strings.Replace(vv, "boost_", "boost-", -1)
+					kv.Value[i] = vv
+				}
+			}
+		}
+	}
 	return err
 }
 
@@ -377,25 +390,164 @@ func sanitize_env_strings(v []string) string {
 	return strings.Join(o, " ")
 }
 
-func init_env_map_from(env henv_t, key string) map[string]interface{} {
-	vv := map[string]interface{}{}
-	old, haskey := env[key]
-	if haskey {
-		switch old := old.(type) {
-		case string:
-			vv["default"] = old
-			panic("boo")
-		case map[string]interface{}:
-			for k, _ := range old {
-				vk := sanitize_env_string(k)
-				vk = strings.Trim(vk, " ")
-				vv[vk] = old[k]
+// w_distill_tgt inspects a list of CMT macro statements and
+// converts these macros into their corresponding waf syntax,
+// directly adding these to the hlib.Target_t target.
+//
+// Note: we only do that for macros whose values are simple
+//       ie: no cmt-tag is involved.
+func w_distill_tgt(tgt *hlib.Target_t, macros map[string][]Stmt) {
+	type mungefct_t func(s string) string
+
+	env_munge := func(s string) string {
+		out := s
+		out = strings.Replace(out, "$(", "${", -1)
+		out = strings.Replace(out, ")", "}", -1)
+		return out
+	}
+
+	linkopts_munge := func(s string) string {
+		if strings.HasPrefix(s, "-l") {
+			s = env_munge(s[len("-l"):])
+		}
+		return s
+	}
+
+	noop_munge := func(s string) string {
+		return s
+	}
+
+	type munger_ctx struct {
+		suffix string
+		fct    mungefct_t
+		out    *[]hlib.Value
+	}
+
+	mungers := []munger_ctx{
+		{
+			suffix: "_shlibflags",
+			fct:    linkopts_munge,
+			out:    &tgt.Use,
+		},
+		{
+			suffix: "linkopts",
+			fct:    linkopts_munge,
+			out:    &tgt.Use,
+		},
+		{
+			suffix: "_pp_cppflags",
+			fct:    noop_munge,
+			out:    &tgt.CxxFlags,
+		},
+		{
+			suffix: "_cxxflags",
+			fct:    noop_munge,
+			out:    &tgt.CxxFlags,
+		},
+		{
+			suffix: "_cflags",
+			fct:    noop_munge,
+			out:    &tgt.CFlags,
+		},
+	}
+
+	// defines_munge := func(s string) string {
+	// 	if strings.HasPrefix(s, "-D") {
+	// 		s = s[len("-D"):]
+	// 	}
+	// 	return s
+	// }
+
+	for n, stmts := range macros {
+		if !strings.HasPrefix(n, tgt.Name) {
+			continue
+		}
+		// fmt.Printf(">>> [%s]:(%s) %v: [", n, tgt.Name, len(stmts))
+		// for _, stmt := range stmts {
+		// 	fmt.Printf("%v (%T), ", stmt, stmt)
+		// }
+		// fmt.Printf("]\n")
+
+		// n_stmts := len(stmts)
+		tgt_decl_stmts := make([]Stmt, 0, len(stmts))
+		tgt_app_stmts := make([]Stmt, 0, len(stmts))
+		tgt_rem_stmts := make([]Stmt, 0, len(stmts))
+
+		for _, stmt := range stmts {
+			switch x := stmt.(type) {
+			case *Macro:
+				if len(x.Set) == 1 {
+					tgt_decl_stmts = append(tgt_decl_stmts, x)
+				}
+			case *MacroAppend:
+				if len(x.Set) == 1 {
+					tgt_app_stmts = append(tgt_app_stmts, x)
+				}
+			case *MacroRemove:
+				if len(x.Set) == 1 {
+					tgt_rem_stmts = append(tgt_rem_stmts, x)
+				}
 			}
-		default:
-			panic(fmt.Sprintf("unknown type: %T", old))
+		}
+
+		stmts = make([]Stmt, 0, len(stmts))
+		stmts = append(stmts, tgt_decl_stmts...)
+		stmts = append(stmts, tgt_app_stmts...)
+		stmts = append(stmts, tgt_rem_stmts...)
+
+		// fmt.Printf("+++ [%s]: %d\n", n, len(stmts))
+		// if n_stmts != len(stmts) {
+		// 	panic(fmt.Errorf("boo: %s: %d -> %d", n, n_stmts, len(stmts)))
+		// }
+
+		// do_select := func(name string) bool {
+		// 	for _, str := range []string{
+		// 		"linkopts",
+		// 		"_dependencies",
+		// 		"_cflags",
+		// 		"_cxxflags",
+		// 		"_shlibflags",
+		// 	} {
+		// 		if strings.HasSuffix(name, str) {
+		// 			return true
+		// 		}
+		// 	}
+		// 	return false
+		// }
+
+		for _, stmt := range stmts {
+			switch x := stmt.(type) {
+			case *Macro:
+				for _, munger := range mungers {
+					if x.Name == tgt.Name+munger.suffix {
+						for i, str := range x.Set[0].Value {
+							x.Set[0].Value[i] = munger.fct(str)
+						}
+						*munger.out = append(*munger.out, *(*hlib.Value)(x))
+					}
+				}
+			case *MacroAppend:
+				for _, munger := range mungers {
+					if x.Name == tgt.Name+munger.suffix {
+						for i, str := range x.Set[0].Value {
+							x.Set[0].Value[i] = munger.fct(str)
+						}
+						*munger.out = append(*munger.out, *(*hlib.Value)(x))
+					}
+				}
+			case *MacroRemove:
+				for _, munger := range mungers {
+					if x.Name == tgt.Name+munger.suffix {
+						for i, str := range x.Set[0].Value {
+							x.Set[0].Value[i] = munger.fct(str)
+						}
+						*munger.out = append(*munger.out, *(*hlib.Value)(x))
+					}
+				}
+			}
 		}
 	}
-	return vv
+
 }
 
 // EOF

@@ -2,166 +2,14 @@ package main
 
 import (
 	"fmt"
-	"path"
-	"path/filepath"
+	"os"
+	"reflect"
 	"strings"
+	"text/template"
 
-	"github.com/gonuts/yaml"
+	//"github.com/gonuts/yaml"
+	"github.com/hwaf/hwaf/hlib"
 )
-
-type hscript_t struct {
-	Package   hpackage_t   `yaml:"package,flow"`
-	Options   hoptions_t   `yaml:"options,omitempty"`
-	Configure hconfigure_t `yaml:"configure,omitempty"`
-	Build     hbuild_t     `yaml:"build,flow,omitempty"`
-}
-
-type hpackage_t struct {
-	Name     string   `yaml:"name,flow"`
-	Authors  []string `yaml:"authors,flow,omitempty"`
-	Managers []string `yaml:"managers,flow,omitempty"`
-	Version  string   `yaml:"version,flow,omitempty"`
-	Deps     hdeps_t  `yaml:"dependencies,flow,omitempty"`
-}
-
-type hdeps_t struct {
-	Public  []string `yaml:"public,flow,omitempty"`
-	Private []string `yaml:"private,flow,omitempty"`
-	Runtime []string `yaml:"runtime,flow,omitempty"`
-}
-
-type hoptions_t struct {
-	Tools    []string `yaml:"tools,flow,omitempty"`
-	HwafCall []string `yaml:"hwaf-call,flow,omitempty"`
-}
-
-type hconfigure_t struct {
-	Tools    []string `yaml:"tools,flow,omitempty"`
-	Env      henv_t   `yaml:"env,flow,omitempty"`
-	Tag      []string `yaml:"tag,flow,omitempty"`
-	HwafCall []string `yaml:"hwaf-call,flow,omitempty"`
-}
-
-// type henv_t struct {
-// 	Map map[string]interface{} `yaml:"map,flow"`
-// }
-type henv_t map[string]interface{} //FIXME: map[string][]interface{} instead ??
-
-// type hbuild_t struct {
-// 	Targets  htargets_t `yaml:"tgts,flow,omitempty"`
-// 	HwafCall []string   `yaml:"hwaf-call,flow,omitempty"`
-// }
-
-type hbuild_t map[string]interface{}
-
-type htargets_t []htarget_t
-
-type htarget_t struct {
-	Name     string   `yaml:"name,flow,omitempty"`
-	Features string   `yaml:"features,flow"`
-	Source   []string `yaml:"source,flow"`
-	Use      []string `yaml:"use,flow,omitempty"`
-	Defines  []string `yaml:"defines,flow,omitempty"`
-	CFlags   []string `yaml:"ccflags,flow,omitempty"`
-	CxxFlags []string `yaml:"cxxflags,flow,omitempty"`
-	Depends  []string `yaml:"depends_on,flow,omitempty"`
-}
-
-// gather macros related to applications/libs
-//  -> <name>linkopts
-//  -> <name>_dependencies
-//  -> <name>_cflags
-//  -> <name>_shlibflags
-func make_target_from(req *ReqFile, stmt Stmt) htarget_t {
-	var tgt htarget_t
-
-	switch stmt.(type) {
-	case *Application:
-		app := stmt.(*Application)
-		tgt = htarget_t{Name: app.Name}
-		sanitize_srcs(app.Source)
-		for _, src := range app.Source {
-			tgt.Source = append(tgt.Source, src)
-		}
-		if features, ok := g_profile.features["application"]; ok {
-			tgt.Features = features
-		}
-
-	case *Library:
-		lib := stmt.(*Library)
-		tgt = htarget_t{Name: lib.Name}
-		sanitize_srcs(lib.Source)
-		for _, src := range lib.Source {
-			tgt.Source = append(tgt.Source, src)
-		}
-		if features, ok := g_profile.features["library"]; ok {
-			tgt.Features = features
-		}
-	}
-
-	type mungefct_t func(s string) string
-
-	// linkopts_munge := func(s string) string {
-	// 	if strings.HasPrefix(s, "-l") {
-	// 		s = s[len("-l"):]
-	// 	}
-	// 	return s
-	// }
-	// defines_munge := func(s string) string {
-	// 	if strings.HasPrefix(s, "-D") {
-	// 		s = s[len("-D"):]
-	// 	}
-	// 	return s
-	// }
-
-	// massage := func(values [][2]string, mungers []mungefct_t) []string {
-	// 	out := make([]string, 0, len(values))
-
-	// 	switch len(values) {
-	// 	case 1:
-	// 		vv := str_split(values[0][1], " ")
-	// 		for ii := range vv {
-	// 			for _, munger := range mungers {
-	// 				vv[ii] = munger(vv[ii])
-	// 			}
-	// 			vv[ii] = strings.Replace(vv[ii], "$(", "${", -1)
-	// 			vv[ii] = strings.Replace(vv[ii], ")", "}", -1)
-	// 		}
-	// 		out = append(out, vv...)
-	// 	default:
-	// 		for _, v := range values {
-	// 			vv := strings.Trim(v[1], " \t")
-	// 			if len(vv) == 0 {
-	// 				continue
-	// 			}
-	// 			vvv := str_split(vv, " ")
-	// 			for ii := range vvv {
-	// 				for _, munger := range mungers {
-	// 					vvv[ii] = munger(vvv[ii])
-	// 				}
-	// 				vvv[ii] = strings.Replace(vvv[ii], "$(", "${", -1)
-	// 				vvv[ii] = strings.Replace(vvv[ii], ")", "}", -1)
-	// 			}
-	// 			out = append(out,
-	// 				fmt.Sprintf("{%s: [%s]}", v[0], w_py_strlist(vvv)),
-	// 			)
-	// 		}
-	// 	}
-	// 	return out
-	// }
-
-	for _, s := range req.Stmts {
-		switch s.(type) {
-		case *Macro:
-			x := s.(*Macro)
-			if !strings.HasPrefix(x.Name, tgt.Name) {
-				continue
-			}
-			// FIXME
-		}
-	}
-	return tgt
-}
 
 func (r *Renderer) render_hscript() error {
 	var err error
@@ -172,256 +20,58 @@ func (r *Renderer) render_hscript() error {
 	)
 	handle_err(err)
 
-	basedir := filepath.Dir(filepath.Dir(r.req.Filename))
+	wscript := &r.pkg
 
-	hscript := hscript_t{
-		Package:   hpackage_t{Name: basedir},
-		Configure: hconfigure_t{Env: make(map[string]interface{})},
-		Build:     make(hbuild_t, 0),
-	}
-
-	//complibs := map[string]struct{}{}
-	linklibs := map[string]*Library{}
-	apps := map[string]*Application{}
-	//dictlibs := map[string]struct{}{}
-
-	// first pass to detect targets
-	for _, stmt := range r.req.Stmts {
-		switch stmt.(type) {
-		case *Application:
-			x := stmt.(*Application)
-			apps[x.Name] = x
-
-		case *Library:
-			x := stmt.(*Library)
-			linklibs[x.Name] = x
-		}
-	}
-
-	// second pass to collect
-	for _, stmt := range r.req.Stmts {
-		hpkg := &hscript.Package
-		hbld := hscript.Build
-		hcfg := &hscript.Configure
-
-		if author, ok := stmt.(*Author); ok {
-			hpkg.Authors = append(hpkg.Authors, author.Name)
-		}
-
-		if mgr, ok := stmt.(*Manager); ok {
-			hpkg.Managers = append(hpkg.Managers, mgr.Name)
-		}
-
-		if version, ok := stmt.(*Version); ok {
-			hpkg.Version = version.Value
-		}
-
-		if use, ok := stmt.(*UsePkg); ok {
-			deps := &hpkg.Deps
-			if use.IsPrivate {
-				deps.Private = append(deps.Private, path.Join(use.Path, use.Package))
-			} else {
-				deps.Public = append(deps.Public, path.Join(use.Path, use.Package))
-			}
-		}
-
-		if lib, ok := stmt.(*Library); ok {
-			linklibs[lib.Name] = lib
-			tgt := make_target_from(r.req, stmt)
-			hbld[tgt.Name] = tgt
-		}
-
-		if app, ok := stmt.(*Application); ok {
-			apps[app.Name] = app
-			tgt := make_target_from(r.req, stmt)
-			hbld[tgt.Name] = tgt
-		}
-
-		if pat, ok := stmt.(*ApplyPattern); ok {
-			if false {
-				fmt.Printf(">>> apply-pattern=%q\n", pat.Name)
-			}
-		}
-
-		if pat, ok := stmt.(*Pattern); ok {
-			if false {
-				fmt.Printf(">>> pattern=%q\n", pat.Name)
-			}
-		}
-
-		if p, ok := stmt.(*Macro); ok {
-			if strings.HasSuffix(p.Name, "_dependencies") {
-				// handled elsewhere
-				continue
-			}
-			// FIXME
-			// fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			// vv := init_env_map_from(hcfg.Env, p.Name)
-			// for tag, v := range p.Value {
-			// 	v = sanitize_env_string(v)
-			// 	vv[tag] = v
-			// }
-			// if len(vv) > 0 {
-			// 	hcfg.Env[p.Name] = vv
-			// }
-		}
-
-		if p, ok := stmt.(*MacroAppend); ok {
-			if strings.HasSuffix(p.Name, "_dependencies") {
-				// handled elsewhere
-				continue
-			}
-			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			// FIXME
-			// vv := init_env_map_from(hcfg.Env, p.Name)
-			// for tag, v := range p.Value {
-			// 	v = sanitize_env_string(v)
-			// 	v = strings.Trim(v, " ")
-			// 	if _, haskey := vv[tag]; haskey {
-			// 		old := vv[tag]
-			// 		//fmt.Printf("--> %q\n", old)
-			// 		switch old.(type) {
-			// 		case string:
-			// 			old := old.(string)
-			// 			if old == "" && v == "" {
-			// 				// no-op
-			// 			} else if old != "" && v == "" {
-			// 				vv[tag] = old
-			// 			} else if old == "" && v != "" {
-			// 				vv[tag] = v
-			// 			} else {
-			// 				vv[tag] = []string{old, v}
-			// 			}
-			// 		case []string:
-			// 			old := old.([]string)
-			// 			if v != "" {
-			// 				val := make([]string, len(old)+1)
-			// 				copy(val, old)
-			// 				val = append(val, v)
-			// 				vv[tag] = val
-			// 			}
-			// 		}
-			//
-			// 	} else {
-			// 		if v == "" {
-			// 			// no-op
-			// 		} else {
-			// 			vv[tag] = []string{fmt.Sprintf("${%s}", p.Name), v}
-			// 		}
-			// 	}
-			// }
-			// if len(vv) > 0 {
-			// 	hcfg.Env[p.Name] = vv
-			// }
-		}
-
-		if _ /*p*/, ok := stmt.(*PathAppend); ok {
-			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			// FIXME
-			// vv := init_env_map_from(hcfg.Env, p.Name)
-			// for tag, v := range p.Value {
-			// 	v = sanitize_env_string(v)
-			// 	if _, haskey := vv[tag]; haskey {
-			// 		old := vv[tag]
-			// 		//fmt.Printf("--> %q\n", old)
-			// 		if old == "" && v == "" {
-			// 			// no-op
-			// 		} else if old != "" && v == "" {
-			// 			vv[tag] = old
-			// 		} else if old == "" && v != "" {
-			// 			vv[tag] = v
-			// 		} else {
-			// 			vv[tag] = fmt.Sprintf("%s:%s", old, v)
-			// 		}
-			//
-			// 	} else {
-			// 		if v == "" {
-			// 			vv[tag] = fmt.Sprintf("${%s}", p.Name)
-			// 		} else {
-			// 			vv[tag] = fmt.Sprintf("${%s}:%s", p.Name, v)
-			// 		}
-			// 	}
-			// }
-			// if len(vv) > 0 {
-			// 	hcfg.Env[p.Name] = vv
-			// }
-		}
-
-		if _ /*p*/, ok := stmt.(*PathRemove); ok {
-			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			continue
-			// FIXME
-			// vv := init_env_map_from(hcfg.Env, p.Name)
-			// for tag, v := range p.Value {
-			// 	v = sanitize_env_string(v)
-			// 	if _, haskey := vv[tag]; haskey {
-			// 		old := vv[tag]
-			// 		//fmt.Printf("--> %q\n", old)
-			// 		vv[tag] = fmt.Sprintf("%s:%s", old, v)
-			//
-			// 	} else {
-			// 		if v == "" {
-			// 			vv[tag] = fmt.Sprintf("${%s}", p.Name)
-			// 		} else {
-			// 			vv[tag] = fmt.Sprintf("${%s}:%s", p.Name, v)
-			// 		}
-			// 	}
-			// }
-			// if len(vv) > 0 {
-			// 	hcfg.Env[p.Name] = vv
-			// }
-		}
-
-		if _ /*p*/, ok := stmt.(*PathPrepend); ok {
-			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			// FIXME
-			// vv := init_env_map_from(hcfg.Env, p.Name)
-			// for tag, v := range p.Value {
-			// 	v = sanitize_env_string(v)
-			// 	if _, haskey := vv[tag]; haskey {
-			// 		old := vv[tag]
-			// 		//fmt.Printf("--> %q\n", old)
-			// 		if old == "" && v == "" {
-			// 			// no-op
-			// 		} else if old != "" && v == "" {
-			// 			vv[tag] = old
-			// 		} else if old == "" && v != "" {
-			// 			vv[tag] = v
-			// 		} else {
-			// 			vv[tag] = fmt.Sprintf("%s:%s", v, old)
-			// 		}
-			// 	} else {
-			// 		if v == "" {
-			// 			vv[tag] = fmt.Sprintf("${%s}", p.Name)
-			// 		} else {
-			// 			vv[tag] = fmt.Sprintf("%s:${%s}", v, p.Name)
-			// 		}
-			// 	}
-			// }
-			// if len(vv) > 0 {
-			// 	hcfg.Env[p.Name] = vv
-			// }
-		}
-
-		if p, ok := stmt.(*SetEnv); ok {
-			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			vv := init_env_map_from(hcfg.Env, p.Name)
-			for _, v := range p.Set {
-				tag := v.Tag
-				val := sanitize_env_strings(v.Value)
-				vv[tag] = val
-			}
-			if len(vv) > 0 {
-				hcfg.Env[p.Name] = vv
-			}
-		}
-
-	}
-
-	out, err := goyaml.Marshal(hscript)
+	// generate package header ------------------------------------------------
+	const pkg_hdr_tmpl = `
+## package header
+package: {
+    name:    {{.Name}},
+    authors: {{.Authors | as_hlist}},
+{{if .Managers}}    managers: {{.Managers | as_hlist}},{{end}}
+{{if .Version}}    version:  "{{.Version}}",{{end}}
+    dependencies: {
+{{. | gen_hscript_pkg_deps}}
+    }
+}
+`
+	err = h_tmpl(r.w, pkg_hdr_tmpl, wscript.Package)
 	handle_err(err)
 
-	_, err = r.w.Write(out)
+	// generate options - section ---------------------------------------------
+	err = h_tmpl(
+		r.w,
+		`
+options: {
+    tools: [{{range .Tools}}{{.}}{{end}}],
+}
+`,
+		wscript.Options,
+	)
+	handle_err(err)
+
+	// generate configure - section -------------------------------------------
+	err = h_tmpl(
+		r.w,
+		`
+configure: {
+    tools: [{{range .Tools}}{{.}}{{end}}],
+}
+`,
+		wscript.Configure,
+	)
+	handle_err(err)
+
+	// generate build - section -----------------------------------------------
+	err = h_tmpl(
+		r.w,
+		`
+build: {
+{{with .Targets}}{{. | gen_hscript_targets}}{{end}}
+}
+`,
+		wscript.Build,
+	)
 	handle_err(err)
 
 	_, err = fmt.Fprintf(
@@ -431,4 +81,146 @@ func (r *Renderer) render_hscript() error {
 	handle_err(err)
 
 	return err
+}
+
+func h_tmpl(w *os.File, text string, data interface{}) error {
+	t := template.New("hscript")
+	t.Funcs(template.FuncMap{
+		"trim": strings.TrimSpace,
+		"as_hlist": func(alist interface{}) string {
+			rv := reflect.ValueOf(alist)
+			str := make([]string, 0, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				s := rv.Index(i)
+				str = append(str, fmt.Sprintf("%s", s))
+			}
+			return "[" + strings.Join(str, ", ") + "]"
+		},
+		"gen_hscript_pkg_deps": gen_hscript_pkg_deps,
+		"gen_hscript_targets":  gen_hscript_targets,
+	})
+	template.Must(t.Parse(text))
+	return t.Execute(w, data)
+}
+
+func gen_hscript_pkg_deps(pkg hlib.Package_t) string {
+	const indent = "    "
+	var str []string
+	public_deps := make([]hlib.Dep_t, 0, len(pkg.Deps))
+	private_deps := make([]hlib.Dep_t, 0, len(pkg.Deps))
+	runtime_deps := make([]hlib.Dep_t, 0, len(pkg.Deps))
+
+	for _, dep := range pkg.Deps {
+		if dep.Type.HasMask(hlib.RuntimeDep) {
+			runtime_deps = append(runtime_deps, dep)
+		}
+		if dep.Type.HasMask(hlib.PublicDep) {
+			public_deps = append(public_deps, dep)
+		}
+		if dep.Type.HasMask(hlib.PrivateDep) {
+			private_deps = append(private_deps, dep)
+		}
+	}
+
+	if len(public_deps) > 0 {
+		str = append(str, "public: [")
+		for _, dep := range public_deps {
+			str = append(str, fmt.Sprintf("%s%s,", indent, dep.Name))
+		}
+		str = append(str, "],")
+	} else {
+		str = append(str, "public: [],")
+	}
+
+	if len(private_deps) > 0 {
+		str = append(str, "private: [")
+		for _, dep := range private_deps {
+			str = append(str, fmt.Sprintf("%s%s,", indent, dep.Name))
+		}
+		str = append(str, "],")
+	} else {
+		str = append(str, "private: [],")
+	}
+
+	if len(runtime_deps) > 0 {
+		str = append(str, "runtime: [")
+		for _, dep := range runtime_deps {
+			str = append(str, fmt.Sprintf("%s%s,", indent, dep.Name))
+		}
+		str = append(str, "],")
+	} else {
+		str = append(str, "runtime: [],")
+	}
+
+	// reindent:
+	for i, s := range str {
+		str[i] = indent + indent + s
+	}
+
+	return strings.Join(str, "\n")
+}
+
+func gen_hscript_targets(tgts hlib.Targets_t) string {
+	const indent = "    "
+	var str []string
+
+	cnv_values := func(values []hlib.Value) []string {
+		out := make([]string, 0, len(values))
+		for _, v := range values {
+			// FIXME what about the non-default values ??
+			out = append(out, v.Set[0].Value...)
+		}
+		return out
+	}
+
+	for _, tgt := range tgts {
+		str = append(str, "")
+		str = append(str, fmt.Sprintf("%s: {", tgt.Name))
+		srcs := cnv_values(tgt.Source)
+		str = append(str,
+			fmt.Sprintf("%sfeatures: %q,", indent, tgt.Features),
+			fmt.Sprintf("%ssource:   [%s],", indent, w_py_strlist(srcs)),
+		)
+
+		for _, vv := range []struct {
+			hdr    string
+			values []hlib.Value
+		}{
+			{"use", tgt.Use},
+			{"defines", tgt.Defines},
+			{"cflags", tgt.CFlags},
+			{"cxxflags", tgt.CxxFlags},
+			{"linkflags", tgt.LinkFlags},
+			{"shlibflags", tgt.ShlibFlags},
+			{"stlibflags", tgt.StlibFlags},
+			{"rpath", tgt.RPath},
+			{"includes", tgt.Includes},
+			{"export_includes", tgt.ExportIncludes},
+		} {
+			if len(vv.values) > 0 {
+				vals := cnv_values(vv.values)
+				str = append(str,
+					fmt.Sprintf(
+						"%s%s: [%s],",
+						indent,
+						vv.hdr,
+						w_py_strlist(vals),
+					),
+				)
+			}
+		}
+		str = append(str,
+			"},",
+		)
+
+	}
+
+	str = append(str, "")
+	str = append(str, "hwaf-call: [],")
+	// reindent:
+	for i, s := range str {
+		str[i] = indent + s
+	}
+
+	return strings.Join(str, "\n")
 }

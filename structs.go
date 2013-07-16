@@ -8,8 +8,10 @@ import (
 )
 
 const (
-	tok_PRIVATE = "private"
-	tok_PUBLIC  = "public"
+	tok_BEG_PRIVATE = "private"
+	tok_BEG_PUBLIC  = "public"
+	tok_END_PRIVATE = "private"
+	tok_END_PUBLIC  = "end_public"
 )
 
 type ReqFile struct {
@@ -286,7 +288,7 @@ func parsePattern(p *Parser) error {
 	return err
 }
 
-type ApplyPattern hlib.Value
+type ApplyPattern hlib.ApplyPatternStmt
 
 func (s *ApplyPattern) ToYaml(w io.Writer) error {
 	return nil
@@ -298,7 +300,11 @@ func parseApplyPattern(p *Parser) error {
 	if tokens[1][0] == '-' {
 		tokens[1], tokens[2] = tokens[2], tokens[1]
 	}
-	vv := ApplyPattern(hlib_value_from_slice(tokens[1], tokens[2:]))
+	vv := ApplyPattern{
+		Name: tokens[1],
+		Args: make([]string, len(tokens[2:])),
+	}
+	copy(vv.Args, tokens[2:])
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -502,27 +508,59 @@ func parseMakeFragment(p *Parser) error {
 	return err
 }
 
+type BeginPrivate string
+
+func (s *BeginPrivate) ToYaml(w io.Writer) error {
+	return nil
+}
+
 func parsePrivate(p *Parser) error {
 	var err error
-	p.ctx = append(p.ctx, tok_PRIVATE)
+	p.ctx = append(p.ctx, tok_BEG_PRIVATE)
+	vv := BeginPrivate(tok_BEG_PRIVATE)
+	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
+}
+
+type EndPrivate string
+
+func (s *EndPrivate) ToYaml(w io.Writer) error {
+	return nil
 }
 
 func parseEndPrivate(p *Parser) error {
 	var err error
 	p.ctx = p.ctx[:len(p.ctx)-1]
+	vv := EndPrivate(tok_END_PRIVATE)
+	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
+}
+
+type BeginPublic string
+
+func (s *BeginPublic) ToYaml(w io.Writer) error {
+	return nil
 }
 
 func parsePublic(p *Parser) error {
 	var err error
-	p.ctx = append(p.ctx, tok_PUBLIC)
+	p.ctx = append(p.ctx, tok_BEG_PUBLIC)
+	vv := BeginPublic(tok_BEG_PUBLIC)
+	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
+}
+
+type EndPublic string
+
+func (s *EndPublic) ToYaml(w io.Writer) error {
+	return nil
 }
 
 func parseEndPublic(p *Parser) error {
 	var err error
 	p.ctx = p.ctx[:len(p.ctx)-1]
+	vv := EndPublic(tok_END_PUBLIC)
+	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
 

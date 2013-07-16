@@ -3,71 +3,20 @@ package main
 import (
 	"fmt"
 	"os"
-	"path"
-	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
 	"text/template"
 
 	"github.com/hwaf/hwaf/hlib"
 )
 
-type wscript_t struct {
-	Package   wpackage_t
-	Options   woptions_t
-	Configure wconfigure_t
-	Build     wbuild_t
-}
-
-type wpackage_t struct {
-	Name     string
-	Authors  []string
-	Managers []string
-	Version  string
-	Deps     wdeps_t
-}
-
-type wdeps_t struct {
-	Public  []string
-	Private []string
-	Runtime []string
-}
-
-type woptions_t struct {
-	Tools []string
-	//Stmts []Stmt
-	//HwafCall []string
-}
-
-type wconfigure_t struct {
-	Tools []string
-	Env   wenv_t
-	Tag   []string
-	Stmts []Stmt
-}
-
-type wenv_t map[string]interface{} //FIXME: map[string][]interface{} instead ??
+//type wenv_t map[string]interface{} //FIXME: map[string][]interface{} instead ??
 
 // type hbuild_t struct {
 // 	Targets  htargets_t `yaml:"tgts,flow,omitempty"`
 // 	HwafCall []string   `yaml:"hwaf-call,flow,omitempty"`
 // }
-
-type wbuild_t struct {
-	Tools   []string
-	Env     wenv_t
-	Targets wtargets_t
-	Stmts   []Stmt
-}
-
-type wtargets_t []wtarget_t
-
-type wtarget_t struct {
-	Name     string
-	Features string
-	Source   []string
-	Use      []string
-	Defines  []string
-}
 
 func (r *Renderer) render_wscript() error {
 	var err error
@@ -84,94 +33,7 @@ import waflib.Logs as msg
 	)
 	handle_err(err)
 
-	basedir := filepath.Dir(filepath.Dir(r.req.Filename))
-
-	wscript := wscript_t{
-		Package:   wpackage_t{Name: basedir},
-		Configure: wconfigure_t{Env: make(wenv_t)},
-		Build:     wbuild_t{Env: make(wenv_t)},
-	}
-
-	//complibs := map[string]struct{}{}
-	linklibs := map[string]*Library{}
-	apps := map[string]*Application{}
-	//dictlibs := map[string]struct{}{}
-
-	// first pass to detect targets
-	for _, stmt := range r.req.Stmts {
-		switch stmt.(type) {
-		case *Application:
-			x := stmt.(*Application)
-			apps[x.Name] = x
-
-		case *Library:
-			x := stmt.(*Library)
-			linklibs[x.Name] = x
-		}
-	}
-
-	// second pass to collect
-	for _, stmt := range r.req.Stmts {
-		wpkg := &wscript.Package
-		wbld := &wscript.Build
-		wcfg := &wscript.Configure
-
-		if author, ok := stmt.(*Author); ok {
-			wpkg.Authors = append(wpkg.Authors, author.Name)
-		}
-
-		if mgr, ok := stmt.(*Manager); ok {
-			wpkg.Managers = append(wpkg.Managers, mgr.Name)
-		}
-
-		if version, ok := stmt.(*Version); ok {
-			wpkg.Version = version.Value
-		}
-
-		if use, ok := stmt.(*UsePkg); ok {
-			deps := &wpkg.Deps
-			if use.IsPrivate {
-				deps.Private = append(deps.Private, path.Join(use.Path, use.Package))
-			} else {
-				deps.Public = append(deps.Public, path.Join(use.Path, use.Package))
-			}
-		}
-
-		if lib, ok := stmt.(*Library); ok {
-			linklibs[lib.Name] = lib
-			tgt := wtarget_t{Name: lib.Name}
-			sanitize_srcs(lib.Source)
-			for _, src := range lib.Source {
-				tgt.Source = append(tgt.Source, src)
-			}
-			if features, ok := g_profile.features["library"]; ok {
-				tgt.Features = features
-			}
-			wbld.Targets = append(wbld.Targets, tgt)
-		}
-
-		if app, ok := stmt.(*Application); ok {
-			apps[app.Name] = app
-			tgt := wtarget_t{Name: app.Name}
-			sanitize_srcs(app.Source)
-			for _, src := range app.Source {
-				tgt.Source = append(tgt.Source, src)
-			}
-			if features, ok := g_profile.features["application"]; ok {
-				tgt.Features = features
-			}
-			wbld.Targets = append(wbld.Targets, tgt)
-			wbld.Targets[len(wbld.Targets)-1].Name = tgt.Name
-		}
-
-		switch stmt.(type) {
-		case *Macro,
-			*MacroAppend, *MacroRemove, *MacroPrepend,
-			*Tag,
-			*PathAppend, *PathPrepend, *PathRemove:
-			wcfg.Stmts = append(wcfg.Stmts, stmt)
-		}
-	}
+	wscript := &r.pkg
 
 	// generate package header
 	const pkg_hdr_tmpl = `
@@ -184,16 +46,7 @@ PACKAGE = {
 
 ### ---------------------------------------------------------------------------
 def pkg_deps(ctx):
-    {{with .Deps}}## public dependencies
-    {{if .Public}}{{range .Public}}ctx.use_pkg("{{.}}", public=True)
-    {{end}}{{else}}## => none{{end}}
-
-    ## private dependencies
-    {{if .Private}}{{range .Private}}ctx.use_pkg("{{.}}", private=True){{end}}{{else}}## => none{{end}}
-
-    ## runtime dependencies
-    {{if .Runtime}}{{range .Runtime}}ctx.use_pkg("{{.}}", runtime=True){{end}}{{else}}## => none{{end}}{{end}}
-
+    {{. | gen_wscript_pkg_deps}}
     return # pkg_deps
 `
 	err = w_tmpl(r.w, pkg_hdr_tmpl, wscript.Package)
@@ -242,7 +95,8 @@ def build(ctx):
     {{end}}
     {{range .Stmts}}##{{. | gen_wscript_stmts}}
     {{end}}
-    return # configure
+    {{with .Targets}}{{. | gen_wscript_targets}}{{end}}
+    return # build
 `,
 		wscript.Build,
 	)
@@ -261,14 +115,18 @@ func w_tmpl(w *os.File, text string, data interface{}) error {
 	t := template.New("wscript")
 	t.Funcs(template.FuncMap{
 		"trim": strings.TrimSpace,
-		"as_pylist": func(list []string) string {
-			str := make([]string, 0, len(list))
-			for _, s := range list {
+		"as_pylist": func(alist interface{}) string {
+			rv := reflect.ValueOf(alist)
+			str := make([]string, 0, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				s := rv.Index(i)
 				str = append(str, fmt.Sprintf("%q", s))
 			}
 			return "[" + strings.Join(str, ", ") + "]"
 		},
-		"gen_wscript_stmts": gen_wscript_stmts,
+		"gen_wscript_pkg_deps": gen_wscript_pkg_deps,
+		"gen_wscript_stmts":    gen_wscript_stmts,
+		"gen_wscript_targets":  gen_wscript_targets,
 	})
 	template.Must(t.Parse(text))
 	return t.Execute(w, data)
@@ -288,13 +146,22 @@ func w_gen_taglist(tags string) []string {
 func w_py_strlist(str []string) string {
 	o := make([]string, 0, len(str))
 	for _, v := range str {
-		o = append(o, fmt.Sprintf("%q", v))
+		vv, err := strconv.Unquote(v)
+		if err != nil {
+			vv = v
+		}
+		if strings.HasPrefix(vv, `"`) && strings.HasSuffix(vv, `"`) {
+			if len(vv) > 1 {
+				vv = vv[1 : len(vv)-1]
+			}
+		}
+		o = append(o, fmt.Sprintf("%q", vv))
 	}
 	return strings.Join(o, ", ")
 }
 
 func w_gen_valdict_switch_str(indent string, values [][2]string) string {
-	o := make([]string, 0, len(values)+2)
+	o := make([]string, 0, len(values))
 	o = append(o, "(")
 	for _, v := range values {
 		tags := w_gen_taglist(v[0])
@@ -302,12 +169,20 @@ func w_gen_valdict_switch_str(indent string, values [][2]string) string {
 		if strings.Count(v[0], "&") <= 0 {
 			key_fmt = "%s"
 		}
+		val_fmt := "%s"
+		if strings.Count(v[1], ",") > 0 {
+			val_fmt = "[%s]"
+		}
+		if len(v[1]) == 0 {
+			val_fmt = "%q"
+		}
+
 		o = append(o,
 			fmt.Sprintf(
-				"%s  {%s: %q},",
+				"%s  {%s: %s},",
 				indent,
 				fmt.Sprintf(key_fmt, w_py_strlist(tags)),
-				v[1],
+				fmt.Sprintf(val_fmt, v[1]),
 			),
 		)
 	}
@@ -336,45 +211,117 @@ func w_py_hlib_value(indent string, fctname string, x hlib.Value) []string {
 	return str
 }
 
-func gen_wscript_stmts(stmt Stmt) string {
+func gen_wscript_pkg_deps(pkg hlib.Package_t) string {
 	const indent = "    "
 	var str []string
-	switch xx := stmt.(type) {
-	case *Macro:
+	public_deps := make([]hlib.Dep_t, 0, len(pkg.Deps))
+	private_deps := make([]hlib.Dep_t, 0, len(pkg.Deps))
+	runtime_deps := make([]hlib.Dep_t, 0, len(pkg.Deps))
+	for _, dep := range pkg.Deps {
+		if dep.Type.HasMask(hlib.RuntimeDep) {
+			runtime_deps = append(runtime_deps, dep)
+		}
+		if dep.Type.HasMask(hlib.PublicDep) {
+			public_deps = append(public_deps, dep)
+		}
+		if dep.Type.HasMask(hlib.PrivateDep) {
+			private_deps = append(private_deps, dep)
+		}
+	}
+
+	str = append(str, "")
+	if len(public_deps) > 0 {
+		str = append(str, "## public dependencies")
+		for _, dep := range public_deps {
+			str = append(
+				str,
+				fmt.Sprintf(
+					"ctx.use_pkg(%q, version=%q, public=True)",
+					dep.Name,
+					dep.Version,
+				),
+			)
+		}
+		str = append(str, "")
+	} else {
+		str = append(str, "## no public dependencies")
+	}
+
+	if len(private_deps) > 0 {
+		str = append(str, "## private dependencies")
+		for _, dep := range private_deps {
+			str = append(
+				str,
+				fmt.Sprintf(
+					"ctx.use_pkg(%q, version=%q, private=True)",
+					dep.Name,
+					dep.Version,
+				),
+			)
+		}
+		str = append(str, "")
+	} else {
+		str = append(str, "## no private dependencies")
+	}
+
+	if len(runtime_deps) > 0 {
+		str = append(str, "## runtime dependencies")
+		for _, dep := range runtime_deps {
+			str = append(
+				str,
+				fmt.Sprintf(
+					"ctx.use_pkg(%q, version=%q, runtime=True)",
+					dep.Name,
+					dep.Version,
+				),
+			)
+		}
+	} else {
+		str = append(str, "## no public dependencies")
+	}
+
+	// reindent:
+	for i, s := range str[1:] {
+		str[i+1] = indent + s
+	}
+
+	return strings.Join(str, "\n")
+}
+
+func gen_wscript_stmts(stmt hlib.Stmt) string {
+	const indent = "    "
+	var str []string
+	switch x := stmt.(type) {
+	case *hlib.MacroStmt:
 		str = []string{fmt.Sprintf("## macro %v", stmt)}
-		x := hlib.Value(*xx)
 		str = append(
 			str,
-			w_py_hlib_value(indent, "hwaf_declare_macro", x)...,
+			w_py_hlib_value(indent, "hwaf_declare_macro", x.Value)...,
 		)
 
-	case *MacroAppend:
+	case *hlib.MacroAppendStmt:
 		str = []string{fmt.Sprintf("## macro_append %v", stmt)}
-		x := hlib.Value(*xx)
 		str = append(
 			str,
-			w_py_hlib_value(indent, "hwaf_macro_append", x)...,
+			w_py_hlib_value(indent, "hwaf_macro_append", x.Value)...,
 		)
 
-	case *MacroPrepend:
+	case *hlib.MacroPrependStmt:
 		str = []string{fmt.Sprintf("## macro_prepend %v", stmt)}
-		x := hlib.Value(*xx)
 		str = append(
 			str,
-			w_py_hlib_value(indent, "hwaf_macro_prepend", x)...,
+			w_py_hlib_value(indent, "hwaf_macro_prepend", x.Value)...,
 		)
 
-	case *MacroRemove:
+	case *hlib.MacroRemoveStmt:
 		str = []string{fmt.Sprintf("## macro_remove %v", stmt)}
-		x := hlib.Value(*xx)
 		str = append(
 			str,
-			w_py_hlib_value(indent, "hwaf_macro_remove", x)...,
+			w_py_hlib_value(indent, "hwaf_macro_remove", x.Value)...,
 		)
 
-	case *Tag:
+	case *hlib.TagStmt:
 		str = []string{fmt.Sprintf("## tag %v", stmt)}
-		x := xx
 		values := w_py_strlist(x.Content)
 		str = append(str,
 			"ctx.hwaf_declare_tag(",
@@ -383,40 +330,104 @@ func gen_wscript_stmts(stmt Stmt) string {
 			")",
 		)
 
-	case *Path:
+	case *hlib.PathStmt:
 		str = []string{fmt.Sprintf("## path %v", stmt)}
-		x := hlib.Value(*xx)
 		str = append(
 			str,
-			w_py_hlib_value(indent, "hwaf_declare_path", x)...,
+			w_py_hlib_value(indent, "hwaf_declare_path", x.Value)...,
 		)
 
-	case *PathAppend:
+	case *hlib.PathAppendStmt:
 		str = []string{fmt.Sprintf("## path_append %v", stmt)}
-		x := hlib.Value(*xx)
 		str = append(
 			str,
-			w_py_hlib_value(indent, "hwaf_path_append", x)...,
+			w_py_hlib_value(indent, "hwaf_path_append", x.Value)...,
 		)
 
-	case *PathPrepend:
+	case *hlib.PathPrependStmt:
 		str = []string{fmt.Sprintf("## path_prepend %v", stmt)}
-		x := hlib.Value(*xx)
 		str = append(
 			str,
-			w_py_hlib_value(indent, "hwaf_path_prepend", x)...,
+			w_py_hlib_value(indent, "hwaf_path_prepend", x.Value)...,
 		)
 
-	case *PathRemove:
+	case *hlib.PathRemoveStmt:
 		str = []string{fmt.Sprintf("## path_remove %v", stmt)}
-		x := hlib.Value(*xx)
 		str = append(
 			str,
-			w_py_hlib_value(indent, "hwaf_path_remove", x)...,
+			w_py_hlib_value(indent, "hwaf_path_remove", x.Value)...,
 		)
+
+	//case *hlib.ApplyPatternStmt:
 
 	default:
 		str = []string{fmt.Sprintf("### **** statement %T (%v)", stmt, stmt)}
+	}
+
+	// reindent:
+	for i, s := range str[1:] {
+		str[i+1] = indent + s
+	}
+
+	return strings.Join(str, "\n")
+}
+
+func gen_wscript_targets(tgts hlib.Targets_t) string {
+	const indent = "    "
+	var str []string
+
+	cnv_values := func(values []hlib.Value) []string {
+		out := make([]string, 0, len(values))
+		for _, v := range values {
+			// FIXME what about the non-default values ??
+			out = append(out, v.Set[0].Value...)
+		}
+		return out
+	}
+
+	for i, tgt := range tgts {
+		if i != 0 {
+			str = append(str, "")
+		}
+		srcs := cnv_values(tgt.Source)
+		str = append(str,
+			"ctx(",
+			fmt.Sprintf("%sfeatures = %q,", indent, tgt.Features),
+			fmt.Sprintf("%sname     = %q,", indent, tgt.Name),
+			fmt.Sprintf("%ssource   = [%s],", indent, w_py_strlist(srcs)),
+		)
+
+		for _, vv := range []struct {
+			hdr    string
+			values []hlib.Value
+		}{
+			{"use", tgt.Use},
+			{"defines", tgt.Defines},
+			{"cflags", tgt.CFlags},
+			{"cxxflags", tgt.CxxFlags},
+			{"linkflags", tgt.LinkFlags},
+			{"shlibflags", tgt.ShlibFlags},
+			{"stlibflags", tgt.StlibFlags},
+			{"rpath", tgt.RPath},
+			{"includes", tgt.Includes},
+			{"export_includes", tgt.ExportIncludes},
+		} {
+			if len(vv.values) > 0 {
+				vals := cnv_values(vv.values)
+				str = append(str,
+					fmt.Sprintf(
+						"%s%s = [%s],",
+						indent,
+						vv.hdr,
+						w_py_strlist(vals),
+					),
+				)
+			}
+		}
+		str = append(str,
+			")",
+		)
+
 	}
 
 	// reindent:
