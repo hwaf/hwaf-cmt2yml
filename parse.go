@@ -80,7 +80,7 @@ func NewParser(fname string) (*Parser, error) {
 		scanner: scanner,
 		req:     &ReqFile{Filename: fname},
 		tokens:  nil,
-		ctx:     []string{tok_PUBLIC},
+		ctx:     []string{tok_BEG_PUBLIC},
 	}
 	return p, nil
 }

@@ -121,12 +121,25 @@ func (r *Renderer) analyze() error {
 		}
 	}
 
-	// third pass to collect
+	// models private/public, end_private/end_public
+	ctx_visible := []bool{true}
+
+	// 3rd pass to collect
 	for _, stmt := range r.req.Stmts {
 		wpkg := &wscript.Package
 		wbld := &wscript.Build
 		wcfg := &wscript.Configure
 		switch x := stmt.(type) {
+
+		case *BeginPublic:
+			ctx_visible = append(ctx_visible, true)
+		case *EndPublic:
+			ctx_visible = ctx_visible[:len(ctx_visible)-1]
+
+		case *BeginPrivate:
+			ctx_visible = append(ctx_visible, false)
+		case *EndPrivate:
+			ctx_visible = ctx_visible[:len(ctx_visible)-1]
 
 		case *Author:
 			wpkg.Authors = append(wpkg.Authors, hlib.Author(x.Name))
@@ -139,11 +152,11 @@ func (r *Renderer) analyze() error {
 
 		case *UsePkg:
 			deptype := hlib.PrivateDep
-			if !x.IsPrivate {
+			if ctx_visible[len(ctx_visible)-1] {
 				deptype = hlib.PublicDep
 			}
 			if str_is_in_slice(x.Switches, "-no_auto_imports") {
-				deptype |= hlib.RuntimeDep
+				deptype = hlib.RuntimeDep | deptype
 			}
 			wpkg.Deps = append(
 				wpkg.Deps,
