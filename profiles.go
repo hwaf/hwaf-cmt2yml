@@ -2,7 +2,7 @@ package main
 
 type Profile struct {
 	patterns map[string]string
-	features map[string]string
+	features map[string][]string
 }
 
 var (
@@ -43,9 +43,9 @@ func init() {
 			"set_cmtpath":           "tdaq_set_cmtpath",
 			"set_release_package":   "tdaq_set_release_package",
 		},
-		features: map[string]string{
-			"application": "tdaq_application",
-			"library":     "tdaq_library",
+		features: map[string][]string{
+			"application": []string{"tdaq_application"},
+			"library":     []string{"tdaq_library"},
 		},
 	}
 

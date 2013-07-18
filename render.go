@@ -162,7 +162,7 @@ func (r *Renderer) analyze() error {
 				wpkg.Deps,
 				hlib.Dep_t{
 					Name:    path.Join(x.Path, x.Package),
-					Version: x.Version,
+					Version: hlib.Version(x.Version),
 					Type:    deptype,
 				},
 			)
