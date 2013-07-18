@@ -3,11 +3,15 @@ package main
 import (
 	"io"
 	"strings"
+
+	"github.com/hwaf/hwaf/hlib"
 )
 
 const (
-	tok_PRIVATE = "private"
-	tok_PUBLIC  = "public"
+	tok_BEG_PRIVATE = "private"
+	tok_BEG_PUBLIC  = "public"
+	tok_END_PRIVATE = "private"
+	tok_END_PUBLIC  = "end_public"
 )
 
 type ReqFile struct {
@@ -20,6 +24,11 @@ func NewReqFile(name string) ReqFile {
 	return ReqFile{
 		Package: Package{name},
 	}
+}
+
+func (req *ReqFile) ToYaml(w io.Writer) error {
+	var err error
+	return err
 }
 
 type Stmt interface {
@@ -36,6 +45,7 @@ var g_dispatch = map[string]ParseFunc{
 	"macro":           parseMacro,
 	"macro_append":    parseMacroAppend,
 	"macro_prepend":   parseMacroPrepend,
+	"macro_remove":    parseMacroRemove,
 	"private":         parsePrivate,
 	"end_private":     parseEndPrivate,
 	"public":          parsePublic,
@@ -137,10 +147,7 @@ func parseUse(p *Parser) error {
 	return err
 }
 
-type Macro struct {
-	Name  string
-	Value map[string]string
-}
+type Macro hlib.Value
 
 func (s *Macro) ToYaml(w io.Writer) error {
 	return nil
@@ -149,23 +156,12 @@ func (s *Macro) ToYaml(w io.Writer) error {
 func parseMacro(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := Macro{Name: tokens[1]}
-	vv.Value = make(map[string]string)
-	vv.Value["default"] = tokens[2]
-	if len(tokens) > 3 {
-		toks := tokens[3:]
-		for i := 0; i+1 < len(toks); i += 2 {
-			vv.Value[toks[i]] = toks[i+1]
-		}
-	}
+	vv := Macro(hlib_value_from_slice(tokens[1], tokens[2:]))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
 
-type MacroAppend struct {
-	Name  string
-	Value map[string]string
-}
+type MacroAppend hlib.Value
 
 func (s *MacroAppend) ToYaml(w io.Writer) error {
 	return nil
@@ -174,23 +170,12 @@ func (s *MacroAppend) ToYaml(w io.Writer) error {
 func parseMacroAppend(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := MacroAppend{Name: tokens[1]}
-	vv.Value = make(map[string]string)
-	vv.Value["default"] = tokens[2]
-	if len(tokens) > 3 {
-		toks := tokens[3:]
-		for i := 0; i+1 < len(toks); i += 2 {
-			vv.Value[toks[i]] = toks[i+1]
-		}
-	}
+	vv := MacroAppend(hlib_value_from_slice(tokens[1], tokens[2:]))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
 
-type MacroPrepend struct {
-	Name  string
-	Value map[string]string
-}
+type MacroPrepend hlib.Value
 
 func (s *MacroPrepend) ToYaml(w io.Writer) error {
 	return nil
@@ -199,15 +184,21 @@ func (s *MacroPrepend) ToYaml(w io.Writer) error {
 func parseMacroPrepend(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := MacroPrepend{Name: tokens[1]}
-	vv.Value = make(map[string]string)
-	vv.Value["default"] = tokens[2]
-	if len(tokens) > 3 {
-		toks := tokens[3:]
-		for i := 0; i+1 < len(toks); i += 2 {
-			vv.Value[toks[i]] = toks[i+1]
-		}
-	}
+	vv := MacroPrepend(hlib_value_from_slice(tokens[1], tokens[2:]))
+	p.req.Stmts = append(p.req.Stmts, &vv)
+	return err
+}
+
+type MacroRemove hlib.Value
+
+func (s *MacroRemove) ToYaml(w io.Writer) error {
+	return nil
+}
+
+func parseMacroRemove(p *Parser) error {
+	var err error
+	tokens := p.tokens
+	vv := MacroRemove(hlib_value_from_slice(tokens[1], tokens[2:]))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -260,10 +251,7 @@ func parseVersion(p *Parser) error {
 	return err
 }
 
-type SetEnv struct {
-	Name  string
-	Value map[string]string
-}
+type SetEnv hlib.Value
 
 func (s *SetEnv) ToYaml(w io.Writer) error {
 	return nil
@@ -272,15 +260,7 @@ func (s *SetEnv) ToYaml(w io.Writer) error {
 func parseSet(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := SetEnv{Name: tokens[1]}
-	vv.Value = make(map[string]string)
-	vv.Value["default"] = tokens[2]
-	if len(tokens) > 3 {
-		toks := tokens[3:]
-		for i := 0; i+1 < len(toks); i += 2 {
-			vv.Value[toks[i]] = toks[i+1]
-		}
-	}
+	vv := SetEnv(hlib_value_from_slice(tokens[1], tokens[2:]))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -308,10 +288,7 @@ func parsePattern(p *Parser) error {
 	return err
 }
 
-type ApplyPattern struct {
-	Name string
-	Args []string
-}
+type ApplyPattern hlib.ApplyPatternStmt
 
 func (s *ApplyPattern) ToYaml(w io.Writer) error {
 	return nil
@@ -323,17 +300,16 @@ func parseApplyPattern(p *Parser) error {
 	if tokens[1][0] == '-' {
 		tokens[1], tokens[2] = tokens[2], tokens[1]
 	}
-	vv := ApplyPattern{Name: tokens[1]}
-	if len(tokens) > 2 {
-		vv.Args = append(vv.Args, tokens[2:]...)
+	vv := ApplyPattern{
+		Name: tokens[1],
+		Args: make([]string, len(tokens[2:])),
 	}
+	copy(vv.Args, tokens[2:])
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
 
-type IgnorePattern struct {
-	Name string
-}
+type IgnorePattern hlib.Value
 
 func (s *IgnorePattern) ToYaml(w io.Writer) error {
 	return nil
@@ -342,15 +318,12 @@ func (s *IgnorePattern) ToYaml(w io.Writer) error {
 func parseIgnorePattern(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := IgnorePattern{Name: tokens[1]}
+	vv := IgnorePattern(hlib_value_from_slice(tokens[1], nil))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
 
-type Path struct {
-	Name  string
-	Value string
-}
+type Path hlib.Value
 
 func (s *Path) ToYaml(w io.Writer) error {
 	return nil
@@ -359,15 +332,12 @@ func (s *Path) ToYaml(w io.Writer) error {
 func parsePath(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := Path{Name: tokens[1], Value: tokens[2]}
+	vv := Path(hlib_value_from_slice(tokens[1], tokens[2:]))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
 
-type PathAppend struct {
-	Name  string
-	Value map[string]string
-}
+type PathAppend hlib.Value
 
 func (s *PathAppend) ToYaml(w io.Writer) error {
 	return nil
@@ -376,23 +346,12 @@ func (s *PathAppend) ToYaml(w io.Writer) error {
 func parsePathAppend(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := PathAppend{Name: tokens[1]}
-	vv.Value = make(map[string]string)
-	vv.Value["default"] = tokens[2]
-	if len(tokens) > 3 {
-		toks := tokens[3:]
-		for i := 0; i+1 < len(toks); i += 2 {
-			vv.Value[toks[i]] = toks[i+1]
-		}
-	}
+	vv := PathAppend(hlib_value_from_slice(tokens[1], tokens[2:]))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
 
-type PathRemove struct {
-	Name  string
-	Value map[string]string
-}
+type PathRemove hlib.Value
 
 func (s *PathRemove) ToYaml(w io.Writer) error {
 	return nil
@@ -401,23 +360,12 @@ func (s *PathRemove) ToYaml(w io.Writer) error {
 func parsePathRemove(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := PathRemove{Name: tokens[1]}
-	vv.Value = make(map[string]string)
-	vv.Value["default"] = tokens[2]
-	if len(tokens) > 3 {
-		toks := tokens[3:]
-		for i := 0; i+1 < len(toks); i += 2 {
-			vv.Value[toks[i]] = toks[i+1]
-		}
-	}
+	vv := PathRemove(hlib_value_from_slice(tokens[1], tokens[2:]))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
 
-type PathPrepend struct {
-	Name  string
-	Value map[string]string
-}
+type PathPrepend hlib.Value
 
 func (s *PathPrepend) ToYaml(w io.Writer) error {
 	return nil
@@ -426,23 +374,12 @@ func (s *PathPrepend) ToYaml(w io.Writer) error {
 func parsePathPrepend(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := PathPrepend{Name: tokens[1]}
-	vv.Value = make(map[string]string)
-	vv.Value["default"] = tokens[2]
-	if len(tokens) > 3 {
-		toks := tokens[3:]
-		for i := 0; i+1 < len(toks); i += 2 {
-			vv.Value[toks[i]] = toks[i+1]
-		}
-	}
+	vv := PathPrepend(hlib_value_from_slice(tokens[1], tokens[2:]))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
 
-type Tag struct {
-	Name    string
-	Content []string
-}
+type Tag hlib.TagStmt
 
 func (s *Tag) ToYaml(w io.Writer) error {
 	return nil
@@ -457,10 +394,7 @@ func parseTag(p *Parser) error {
 	return err
 }
 
-type ApplyTag struct {
-	Name string
-	Args []string
-}
+type ApplyTag hlib.Value
 
 func (s *ApplyTag) ToYaml(w io.Writer) error {
 	return nil
@@ -486,10 +420,7 @@ func parseLibrary(p *Parser) error {
 	return err
 }
 
-type Action struct {
-	Name  string
-	Value map[string]string
-}
+type Action hlib.Value
 
 func (s *Action) ToYaml(w io.Writer) error {
 	return nil
@@ -498,15 +429,7 @@ func (s *Action) ToYaml(w io.Writer) error {
 func parseAction(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := Action{Name: tokens[1]}
-	vv.Value = make(map[string]string)
-	vv.Value["default"] = tokens[2]
-	if len(tokens) > 3 {
-		toks := tokens[3:]
-		for i := 0; i+1 < len(toks); i += 2 {
-			vv.Value[toks[i]] = toks[i+1]
-		}
-	}
+	vv := Action(hlib_value_from_slice(tokens[1], tokens[2:]))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -571,9 +494,7 @@ func parseCmtPathPattern(p *Parser) error {
 	return err
 }
 
-type MakeFragment struct {
-	Name string
-}
+type MakeFragment hlib.MakeFragmentStmt
 
 func (s *MakeFragment) ToYaml(w io.Writer) error {
 	return nil
@@ -587,27 +508,59 @@ func parseMakeFragment(p *Parser) error {
 	return err
 }
 
+type BeginPrivate string
+
+func (s *BeginPrivate) ToYaml(w io.Writer) error {
+	return nil
+}
+
 func parsePrivate(p *Parser) error {
 	var err error
-	p.ctx = append(p.ctx, tok_PRIVATE)
+	p.ctx = append(p.ctx, tok_BEG_PRIVATE)
+	vv := BeginPrivate(tok_BEG_PRIVATE)
+	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
+}
+
+type EndPrivate string
+
+func (s *EndPrivate) ToYaml(w io.Writer) error {
+	return nil
 }
 
 func parseEndPrivate(p *Parser) error {
 	var err error
 	p.ctx = p.ctx[:len(p.ctx)-1]
+	vv := EndPrivate(tok_END_PRIVATE)
+	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
+}
+
+type BeginPublic string
+
+func (s *BeginPublic) ToYaml(w io.Writer) error {
+	return nil
 }
 
 func parsePublic(p *Parser) error {
 	var err error
-	p.ctx = append(p.ctx, tok_PUBLIC)
+	p.ctx = append(p.ctx, tok_BEG_PUBLIC)
+	vv := BeginPublic(tok_BEG_PUBLIC)
+	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
+}
+
+type EndPublic string
+
+func (s *EndPublic) ToYaml(w io.Writer) error {
+	return nil
 }
 
 func parseEndPublic(p *Parser) error {
 	var err error
 	p.ctx = p.ctx[:len(p.ctx)-1]
+	vv := EndPublic(tok_END_PUBLIC)
+	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
 

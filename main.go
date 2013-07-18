@@ -31,6 +31,11 @@ func main() {
 
 	fnames := []string{}
 	fmt.Printf(">>> dir=%q\n", dir)
+	if !path_exists(dir) {
+		fmt.Printf("** no such file or directory [%s]\n", dir)
+		os.Exit(1)
+	}
+
 	err = filepath.Walk(dir, func(path string, fi os.FileInfo, err error) error {
 		//fmt.Printf("::> [%s]...\n", path)
 		if filepath.Base(path) != "requirements" {
@@ -42,6 +47,11 @@ func main() {
 		return err
 	})
 	handle_err(err)
+
+	if len(fnames) < 1 {
+		fmt.Printf(":: hwaf-cmt2yml: no requirements file under [%s]\n", dir)
+		os.Exit(0)
+	}
 
 	type Response struct {
 		req *ReqFile
@@ -59,7 +69,7 @@ func main() {
 				}
 				return
 			}
-			err = render_yaml(reqfile)
+			err = render_script(reqfile)
 			if err != nil {
 				ch <- Response{
 					reqfile,

@@ -14,6 +14,27 @@ func TestParseLine(t *testing.T) {
 		expected []string
 	}{
 		{
+			fname: "testdata/correct_gcc_config_tag.txt",
+			expected: []string{
+				"macro", "correct_gcc_config_tag", "i686-slc5-gcc43-opt",
+				"x86_64", "x86_64-slc5",
+			},
+		},
+		{
+			fname: "testdata/buggy_gcc_config_tag.txt",
+			expected: []string{
+				"macro", "buggy_gcc_config_tag", "i686-slc5-gcc43-opt",
+				"x86_64", "x86_64-slc5",
+			},
+		},
+		// FIXME!!
+		{
+			fname: "testdata/pp_cppflags.txt",
+			expected: []string{
+				"macro_append", "pp_cppflags", `-DTDAQ_PACKAGE_NAME="$(package)"`,
+			},
+		},
+		{
 			fname: "testdata/lib_suffix.txt",
 			expected: []string{
 				"macro", "lib_suffix", ".so",

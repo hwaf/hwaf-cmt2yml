@@ -1,109 +1,372 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
-	"github.com/gonuts/yaml"
+	"github.com/hwaf/hwaf/hlib"
 )
 
-func render_yaml(req *ReqFile) error {
+type Renderer struct {
+	req     *ReqFile
+	wscript bool
+	w       *os.File
+	pkg     hlib.Wscript_t
+}
+
+func NewRenderer(req *ReqFile) (*Renderer, error) {
+	var err error
+	var r *Renderer
+
+	r = &Renderer{req: req, wscript: false}
+	return r, err
+}
+
+func (r *Renderer) Render() error {
+	var err error
+	err = r.analyze()
+	if err != nil {
+		return err
+	}
+	err = r.render()
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func (r *Renderer) analyze() error {
 	var err error
 
-	fname := filepath.Join(filepath.Dir(filepath.Dir(req.Filename)), "hscript")
-	hscript, err := os.Create(fname)
-	handle_err(err)
-	defer hscript.Close()
+	basedir := filepath.Dir(filepath.Dir(r.req.Filename))
 
-	err = req.ToYaml(hscript)
-	handle_err(err)
-
-	hscript.Sync()
-	err = hscript.Close()
-	handle_err(err)
-
-	if false {
-		hscript, err = os.Open(fname)
-		handle_err(err)
-		hprint, err := os.Create(fname + ".ok")
-		handle_err(err)
-
-		pprint := exec.Command("python", "-c", "import yaml, sys; o = yaml.load(sys.stdin); yaml.dump(o, stream=sys.stdout)")
-		pprint.Stdin = hscript
-		pprint.Stdout = hprint
-		err = pprint.Run()
+	r.pkg = hlib.Wscript_t{
+		Package:   hlib.Package_t{Name: basedir},
+		Configure: hlib.Configure_t{Env: make(hlib.Env_t)},
+		Build:     hlib.Build_t{Env: make(hlib.Env_t)},
 	}
+	wscript := &r.pkg
+
+	// targets
+	apps := make(map[string]*Application)
+	libs := make(map[string]*Library)
+
+	// first pass: discover targets
+	for _, stmt := range r.req.Stmts {
+		switch stmt.(type) {
+		case *Application:
+			x := stmt.(*Application)
+			apps[x.Name] = x
+
+		case *Library:
+			x := stmt.(*Library)
+			libs[x.Name] = x
+		}
+	}
+
+	// list of macros related to targets.
+	// this will be used to:
+	//  - fold them together
+	//  - pre-process macro_append, macro_remove, ...
+	//  - dispatch to wscript equivalents. e.g.:
+	//     - <name>linkopts -> ctx(use=[...], cxxshlibflags=[...])
+	//     - <name>_dependencies -> ctx(depends_on=[...])
+	//     - includes -> ctx(includes=[..])
+	macros := make(map[string][]Stmt)
+
+	tgt_names := make([]string, 0, len(apps)+len(libs))
+	for k, _ := range apps {
+		tgt_names = append(tgt_names, k)
+	}
+	for k, _ := range libs {
+		tgt_names = append(tgt_names, k)
+	}
+	sort.Strings(tgt_names)
+
+	//fmt.Printf("+++ tgt_names: %v\n", tgt_names)
+
+	// second pass: collect macros
+	for _, stmt := range r.req.Stmts {
+		switch x := stmt.(type) {
+		default:
+			continue
+		case *Macro:
+			//fmt.Printf("== [%s] ==\n", x.Name)
+			//pat := x.Name+"(_dependencies|linkopts)"
+			pat := ".*?"
+			if !re_is_in_slice_suffix(tgt_names, x.Name, pat) {
+				continue
+			}
+			macros[x.Name] = append(macros[x.Name], x)
+
+		case *MacroAppend:
+			pat := ".*?"
+			if !re_is_in_slice_suffix(tgt_names, x.Name, pat) {
+				continue
+			}
+			macros[x.Name] = append(macros[x.Name], x)
+
+		case *MacroRemove:
+			pat := ".*?"
+			if !re_is_in_slice_suffix(tgt_names, x.Name, pat) {
+				continue
+			}
+			macros[x.Name] = append(macros[x.Name], x)
+
+		}
+	}
+
+	// models private/public, end_private/end_public
+	ctx_visible := []bool{true}
+
+	// 3rd pass to collect
+	for _, stmt := range r.req.Stmts {
+		wpkg := &wscript.Package
+		wbld := &wscript.Build
+		wcfg := &wscript.Configure
+		switch x := stmt.(type) {
+
+		case *BeginPublic:
+			ctx_visible = append(ctx_visible, true)
+		case *EndPublic:
+			ctx_visible = ctx_visible[:len(ctx_visible)-1]
+
+		case *BeginPrivate:
+			ctx_visible = append(ctx_visible, false)
+		case *EndPrivate:
+			ctx_visible = ctx_visible[:len(ctx_visible)-1]
+
+		case *Author:
+			wpkg.Authors = append(wpkg.Authors, hlib.Author(x.Name))
+
+		case *Manager:
+			wpkg.Managers = append(wpkg.Managers, hlib.Manager(x.Name))
+
+		case *Version:
+			wpkg.Version = hlib.Version(x.Value)
+
+		case *UsePkg:
+			deptype := hlib.PrivateDep
+			if ctx_visible[len(ctx_visible)-1] {
+				deptype = hlib.PublicDep
+			}
+			if str_is_in_slice(x.Switches, "-no_auto_imports") {
+				deptype = hlib.RuntimeDep | deptype
+			}
+			wpkg.Deps = append(
+				wpkg.Deps,
+				hlib.Dep_t{
+					Name:    path.Join(x.Path, x.Package),
+					Version: hlib.Version(x.Version),
+					Type:    deptype,
+				},
+			)
+
+		case *Library:
+			tgt := hlib.Target_t{Name: x.Name}
+			srcs, rest := sanitize_srcs(x.Source)
+			// FIXME: handle -s=some/dir
+			if len(rest) > 0 {
+			}
+			val := hlib.Value{
+				Name: x.Name,
+				Set: []hlib.KeyValue{
+					{Tag: "default", Value: srcs},
+				},
+			}
+			tgt.Source = append(tgt.Source, val)
+			if features, ok := g_profile.features["library"]; ok {
+				tgt.Features = features
+			}
+			w_distill_tgt(&tgt, macros)
+			wbld.Targets = append(wbld.Targets, tgt)
+
+		case *Application:
+			tgt := hlib.Target_t{Name: x.Name}
+			srcs, rest := sanitize_srcs(x.Source)
+			// FIXME: handle -s=some/dir
+			if len(rest) > 0 {
+			}
+			val := hlib.Value{
+				Name: x.Name,
+				Set: []hlib.KeyValue{
+					{Tag: "default", Value: srcs},
+				},
+			}
+
+			tgt.Source = append(tgt.Source, val)
+			if features, ok := g_profile.features["application"]; ok {
+				tgt.Features = features
+			}
+			w_distill_tgt(&tgt, macros)
+			wbld.Targets = append(wbld.Targets, tgt)
+
+		case *Macro:
+			if _, ok := macros[x.Name]; ok {
+				// this will be used by a library or application
+				continue
+			}
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.MacroStmt{Value: val})
+
+		case *MacroAppend:
+			if _, ok := macros[x.Name]; ok {
+				// this will be used by a library or application
+				continue
+			}
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.MacroAppendStmt{Value: val})
+
+		case *MacroRemove:
+			if _, ok := macros[x.Name]; ok {
+				// this will be used by a library or application
+				continue
+			}
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.MacroRemoveStmt{Value: val})
+
+		case *Path:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.PathStmt{Value: val})
+
+		case *PathAppend:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.PathAppendStmt{Value: val})
+
+		case *PathRemove:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.PathRemoveStmt{Value: val})
+
+		case *Pattern:
+			//val := hlib.Value(*x)
+			//wcfg.Stmts = append(wcfg.Stmts, &hlib.PatternStmt{Value: val})
+
+		case *ApplyPattern:
+			wbld.Stmts = append(wbld.Stmts, (*hlib.ApplyPatternStmt)(x))
+
+		case *Tag:
+			wcfg.Stmts = append(wcfg.Stmts, (*hlib.TagStmt)(x))
+
+		case *ApplyTag:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.ApplyTagStmt{Value: val})
+
+		case *MakeFragment:
+			wcfg.Stmts = append(wcfg.Stmts, (*hlib.MakeFragmentStmt)(x))
+		}
+	}
+
+	for _, stmt := range r.req.Stmts {
+		switch stmt.(type) {
+		case *PathRemove, *MakeFragment, *Pattern:
+			r.wscript = true
+			return nil
+		}
+	}
+
+	// fixups for boost
+	for _, tgt := range wscript.Build.Targets {
+		for _, use := range tgt.Use {
+			for _, kv := range use.Set {
+				for i, vv := range kv.Value {
+					vv = strings.Replace(vv, "-${boost_libsuffix}", "", -1)
+					vv = strings.Replace(vv, "boost_", "boost-", -1)
+					kv.Value[i] = vv
+				}
+			}
+		}
+	}
+	return err
+}
+
+func (r *Renderer) render() error {
+	var err error
+	pkgdir := filepath.Dir(filepath.Dir(r.req.Filename))
+	fname := ""
+	render := r.render_hscript
+	if r.wscript {
+		fname = filepath.Join(pkgdir, "wscript")
+		render = r.render_wscript
+	} else {
+		fname = filepath.Join(pkgdir, "hscript.yml")
+		render = r.render_hscript
+	}
+
+	if path_exists(fname) {
+		f, err := os.Open(fname)
+		if err == nil {
+			buf := make([]byte, 64)
+			f.Read(buf)
+			if !bytes.HasPrefix(buf, []byte(`## automatically generated by cmt2yml`)) {
+				// user generated file.
+				// keep it.
+				fmt.Printf("**warning** file [%s] already present\n", fname)
+				return nil
+			}
+		}
+	}
+
+	r.w, err = os.Create(fname)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		r.w.Sync()
+		r.w.Close()
+	}()
+
+	err = render()
+	return err
+}
+
+func render_script(req *ReqFile) error {
+	var err error
+
+	renderer, err := NewRenderer(req)
+	if err != nil {
+		return err
+	}
+
+	err = renderer.Render()
+	if err != nil {
+		return err
+	}
+
+	// if false {
+	// 	hscript, err = os.Open(fname)
+	// 	handle_err(err)
+	// 	hprint, err := os.Create(fname + ".ok")
+	// 	handle_err(err)
+
+	// 	pprint := exec.Command("python", "-c", "import yaml, sys; o = yaml.load(sys.stdin); yaml.dump(o, stream=sys.stdout)")
+	// 	pprint.Stdin = hscript
+	// 	pprint.Stdout = hprint
+	// 	err = pprint.Run()
+	// }
 
 	return err
 }
 
-type hscript_t struct {
-	Package   hpackage_t   `yaml:"package,flow"`
-	Options   hoptions_t   `yaml:"options,omitempty"`
-	Configure hconfigure_t `yaml:"configure,omitempty"`
-	Build     hbuild_t     `yaml:"build,flow,omitempty"`
-}
-
-type hpackage_t struct {
-	Name     string   `yaml:"name,flow"`
-	Authors  []string `yaml:"authors,flow,omitempty"`
-	Managers []string `yaml:"managers,flow,omitempty"`
-	Version  string   `yaml:"version,flow,omitempty"`
-	Deps     hdeps_t  `yaml:"dependencies,flow,omitempty"`
-}
-
-type hdeps_t struct {
-	Public  []string `yaml:"public,flow,omitempty"`
-	Private []string `yaml:"private,flow,omitempty"`
-	Runtime []string `yaml:"runtime,flow,omitempty"`
-}
-
-type hoptions_t struct {
-	Tools    []string `yaml:"tools,flow,omitempty"`
-	HwafCall []string `yaml:"hwaf-call,flow,omitempty"`
-}
-
-type hconfigure_t struct {
-	Tools    []string `yaml:"tools,flow,omitempty"`
-	Env      henv_t   `yaml:"env,omitempty"`
-	Tag      []string `yaml:"tag,flow,omitempty"`
-	HwafCall []string `yaml:"hwaf-call,flow,omitempty"`
-}
-
-// type henv_t struct {
-// 	Map map[string]interface{} `yaml:"map,flow"`
-// }
-type henv_t map[string]interface{} //FIXME: map[string][]interface{} instead ??
-
-// type hbuild_t struct {
-// 	Targets  htargets_t `yaml:"tgts,flow,omitempty"`
-// 	HwafCall []string   `yaml:"hwaf-call,flow,omitempty"`
-// }
-
-type hbuild_t map[string]interface{}
-
-type htargets_t []htarget_t
-
-type htarget_t struct {
-	Name     string   `yaml:"name,flow,omitempty"`
-	Features string   `yaml:"features,flow"`
-	Source   []string `yaml:"source,flow"`
-	Use      []string `yaml:"use,flow,omitempty"`
-	Defines  []string `yaml:"defines,flow,omitempty"`
-}
-
-func sanitize_srcs(sources []string) []string {
-	for i, src := range sources {
+func sanitize_srcs(sources []string) (srcs []string, rest []string) {
+	srcs = make([]string, 0, len(sources))
+	rest = make([]string, 0)
+	for _, src := range sources {
 		if strings.HasPrefix(src, "../") {
-			sources[i] = src[len("../"):]
+			src = src[len("../"):]
 		}
+		if strings.HasPrefix(src, "-") {
+			// discard -globals -no_prototypes -s=$(some)/src
+			rest = append(rest, src)
+			continue
+		}
+		srcs = append(srcs, src)
 	}
-	return sources
+	return srcs, rest
 }
 
 func sanitize_env_string(v string) string {
@@ -118,283 +381,173 @@ func sanitize_env_string(v string) string {
 	return v
 }
 
-func init_env_map_from(env henv_t, key string) map[string]interface{} {
-	vv := map[string]interface{}{}
-	old, haskey := env[key]
-	if haskey {
-		switch old.(type) {
-		case string:
-			vv["default"] = old
-			panic("boo")
-		case map[string]interface{}:
-			old := env[key].(map[string]interface{})
-			for k, _ := range old {
-				vk := sanitize_env_string(k)
-				vk = strings.Trim(vk, " ")
-				vv[vk] = old[k]
-			}
-		default:
-			panic(fmt.Sprintf("unknown type: %T", old))
-		}
+func sanitize_env_strings(v []string) string {
+	o := make([]string, 0, len(v))
+	for _, vv := range v {
+		vv = sanitize_env_string(vv)
+		o = append(o, vv)
 	}
-	return vv
+	return strings.Join(o, " ")
 }
 
-func (req *ReqFile) ToYaml(w io.Writer) error {
-	var err error
+// w_distill_tgt inspects a list of CMT macro statements and
+// converts these macros into their corresponding waf syntax,
+// directly adding these to the hlib.Target_t target.
+//
+// Note: we only do that for macros whose values are simple
+//       ie: no cmt-tag is involved.
+func w_distill_tgt(tgt *hlib.Target_t, macros map[string][]Stmt) {
+	type mungefct_t func(s string) string
 
-	_, err = fmt.Fprintf(
-		w,
-		"## automatically generated by cmt2yml\n## do NOT edit\n\n",
-	)
-	handle_err(err)
-
-	basedir := filepath.Dir(filepath.Dir(req.Filename))
-
-	hscript := hscript_t{
-		Package:   hpackage_t{Name: basedir},
-		Configure: hconfigure_t{Env: make(map[string]interface{})},
-		Build:     make(hbuild_t, 0),
+	env_munge := func(s string) string {
+		out := s
+		out = strings.Replace(out, "$(", "${", -1)
+		out = strings.Replace(out, ")", "}", -1)
+		return out
 	}
 
-	//complibs := map[string]struct{}{}
-	linklibs := map[string]*Library{}
-	apps := map[string]*Application{}
-	//dictlibs := map[string]struct{}{}
-
-	for _, stmt := range req.Stmts {
-		hpkg := &hscript.Package
-		hbld := hscript.Build
-		hcfg := &hscript.Configure
-
-		if author, ok := stmt.(*Author); ok {
-			hpkg.Authors = append(hpkg.Authors, author.Name)
+	linkopts_munge := func(s string) string {
+		if strings.HasPrefix(s, "-l") {
+			s = env_munge(s[len("-l"):])
 		}
+		return s
+	}
 
-		if mgr, ok := stmt.(*Manager); ok {
-			hpkg.Managers = append(hpkg.Managers, mgr.Name)
-		}
+	noop_munge := func(s string) string {
+		return s
+	}
 
-		if version, ok := stmt.(*Version); ok {
-			hpkg.Version = version.Value
-		}
+	type munger_ctx struct {
+		suffix string
+		fct    mungefct_t
+		out    *[]hlib.Value
+	}
 
-		if use, ok := stmt.(*UsePkg); ok {
-			deps := &hpkg.Deps
-			if use.IsPrivate {
-				deps.Private = append(deps.Private, path.Join(use.Path, use.Package))
-			} else {
-				deps.Public = append(deps.Public, path.Join(use.Path, use.Package))
-			}
-		}
+	mungers := []munger_ctx{
+		{
+			suffix: "_shlibflags",
+			fct:    linkopts_munge,
+			out:    &tgt.Use,
+		},
+		{
+			suffix: "linkopts",
+			fct:    linkopts_munge,
+			out:    &tgt.Use,
+		},
+		{
+			suffix: "_pp_cppflags",
+			fct:    noop_munge,
+			out:    &tgt.CxxFlags,
+		},
+		{
+			suffix: "_cxxflags",
+			fct:    noop_munge,
+			out:    &tgt.CxxFlags,
+		},
+		{
+			suffix: "_cflags",
+			fct:    noop_munge,
+			out:    &tgt.CFlags,
+		},
+	}
 
-		if lib, ok := stmt.(*Library); ok {
-			linklibs[lib.Name] = lib
-			tgt := htarget_t{Name: lib.Name}
-			sanitize_srcs(lib.Source)
-			for _, src := range lib.Source {
-				tgt.Source = append(tgt.Source, src)
-			}
-			if features, ok := g_profile.features["library"]; ok {
-				tgt.Features = features
-			}
-			hbld[tgt.Name] = tgt
-		}
+	// defines_munge := func(s string) string {
+	// 	if strings.HasPrefix(s, "-D") {
+	// 		s = s[len("-D"):]
+	// 	}
+	// 	return s
+	// }
 
-		if app, ok := stmt.(*Application); ok {
-			apps[app.Name] = app
-			tgt := htarget_t{Name: app.Name}
-			sanitize_srcs(app.Source)
-			for _, src := range app.Source {
-				tgt.Source = append(tgt.Source, src)
-			}
-			if features, ok := g_profile.features["application"]; ok {
-				tgt.Features = features
-			}
-			hbld[tgt.Name] = tgt
-		}
-
-		if pat, ok := stmt.(*ApplyPattern); ok {
-			if false {
-				fmt.Printf(">>> apply-pattern=%q\n", pat.Name)
-			}
-		}
-
-		if pat, ok := stmt.(*Pattern); ok {
-			if false {
-				fmt.Printf(">>> pattern=%q\n", pat.Name)
-			}
-		}
-
-		if p, ok := stmt.(*Macro); ok {
-			fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			vv := init_env_map_from(hcfg.Env, p.Name)
-			for tag, v := range p.Value {
-				v = sanitize_env_string(v)
-				vv[tag] = v
-			}
-			if len(vv) > 0 {
-				hcfg.Env[p.Name] = vv
-			}
-		}
-
-		if p, ok := stmt.(*MacroAppend); ok {
-			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			vv := init_env_map_from(hcfg.Env, p.Name)
-			for tag, v := range p.Value {
-				v = sanitize_env_string(v)
-				v = strings.Trim(v, " ")
-				if _, haskey := vv[tag]; haskey {
-					old := vv[tag]
-					//fmt.Printf("--> %q\n", old)
-					switch old.(type) {
-					case string:
-						old := old.(string)
-						if old == "" && v == "" {
-							// no-op
-						} else if old != "" && v == "" {
-							vv[tag] = old
-						} else if old == "" && v != "" {
-							vv[tag] = v
-						} else {
-							vv[tag] = []string{old, v}
-						}
-					case []string:
-						old := old.([]string)
-						if v != "" {
-							val := make([]string, len(old)+1)
-							copy(val, old)
-							val = append(val, v)
-							vv[tag] = val
-						}
-					}
-
-				} else {
-					if v == "" {
-						// no-op
-					} else {
-						vv[tag] = []string{fmt.Sprintf("${%s}", p.Name), v}
-					}
-				}
-			}
-			if len(vv) > 0 {
-				hcfg.Env[p.Name] = vv
-			}
-		}
-
-		if p, ok := stmt.(*PathAppend); ok {
-			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			vv := init_env_map_from(hcfg.Env, p.Name)
-			for tag, v := range p.Value {
-				v = sanitize_env_string(v)
-				if _, haskey := vv[tag]; haskey {
-					old := vv[tag]
-					//fmt.Printf("--> %q\n", old)
-					if old == "" && v == "" {
-						// no-op
-					} else if old != "" && v == "" {
-						vv[tag] = old
-					} else if old == "" && v != "" {
-						vv[tag] = v
-					} else {
-						vv[tag] = fmt.Sprintf("%s:%s", old, v)
-					}
-
-				} else {
-					if v == "" {
-						vv[tag] = fmt.Sprintf("${%s}", p.Name)
-					} else {
-						vv[tag] = fmt.Sprintf("${%s}:%s", p.Name, v)
-					}
-				}
-			}
-			if len(vv) > 0 {
-				hcfg.Env[p.Name] = vv
-			}
-		}
-
-		if p, ok := stmt.(*PathRemove); ok {
-			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
+	for n, stmts := range macros {
+		if !strings.HasPrefix(n, tgt.Name) {
 			continue
+		}
+		// fmt.Printf(">>> [%s]:(%s) %v: [", n, tgt.Name, len(stmts))
+		// for _, stmt := range stmts {
+		// 	fmt.Printf("%v (%T), ", stmt, stmt)
+		// }
+		// fmt.Printf("]\n")
 
-			vv := init_env_map_from(hcfg.Env, p.Name)
-			for tag, v := range p.Value {
-				v = sanitize_env_string(v)
-				if _, haskey := vv[tag]; haskey {
-					old := vv[tag]
-					//fmt.Printf("--> %q\n", old)
-					vv[tag] = fmt.Sprintf("%s:%s", old, v)
+		// n_stmts := len(stmts)
+		tgt_decl_stmts := make([]Stmt, 0, len(stmts))
+		tgt_app_stmts := make([]Stmt, 0, len(stmts))
+		tgt_rem_stmts := make([]Stmt, 0, len(stmts))
 
-				} else {
-					if v == "" {
-						vv[tag] = fmt.Sprintf("${%s}", p.Name)
-					} else {
-						vv[tag] = fmt.Sprintf("${%s}:%s", p.Name, v)
+		for _, stmt := range stmts {
+			switch x := stmt.(type) {
+			case *Macro:
+				if len(x.Set) == 1 {
+					tgt_decl_stmts = append(tgt_decl_stmts, x)
+				}
+			case *MacroAppend:
+				if len(x.Set) == 1 {
+					tgt_app_stmts = append(tgt_app_stmts, x)
+				}
+			case *MacroRemove:
+				if len(x.Set) == 1 {
+					tgt_rem_stmts = append(tgt_rem_stmts, x)
+				}
+			}
+		}
+
+		stmts = make([]Stmt, 0, len(stmts))
+		stmts = append(stmts, tgt_decl_stmts...)
+		stmts = append(stmts, tgt_app_stmts...)
+		stmts = append(stmts, tgt_rem_stmts...)
+
+		// fmt.Printf("+++ [%s]: %d\n", n, len(stmts))
+		// if n_stmts != len(stmts) {
+		// 	panic(fmt.Errorf("boo: %s: %d -> %d", n, n_stmts, len(stmts)))
+		// }
+
+		// do_select := func(name string) bool {
+		// 	for _, str := range []string{
+		// 		"linkopts",
+		// 		"_dependencies",
+		// 		"_cflags",
+		// 		"_cxxflags",
+		// 		"_shlibflags",
+		// 	} {
+		// 		if strings.HasSuffix(name, str) {
+		// 			return true
+		// 		}
+		// 	}
+		// 	return false
+		// }
+
+		for _, stmt := range stmts {
+			switch x := stmt.(type) {
+			case *Macro:
+				for _, munger := range mungers {
+					if x.Name == tgt.Name+munger.suffix {
+						for i, str := range x.Set[0].Value {
+							x.Set[0].Value[i] = munger.fct(str)
+						}
+						*munger.out = append(*munger.out, *(*hlib.Value)(x))
+					}
+				}
+			case *MacroAppend:
+				for _, munger := range mungers {
+					if x.Name == tgt.Name+munger.suffix {
+						for i, str := range x.Set[0].Value {
+							x.Set[0].Value[i] = munger.fct(str)
+						}
+						*munger.out = append(*munger.out, *(*hlib.Value)(x))
+					}
+				}
+			case *MacroRemove:
+				for _, munger := range mungers {
+					if x.Name == tgt.Name+munger.suffix {
+						for i, str := range x.Set[0].Value {
+							x.Set[0].Value[i] = munger.fct(str)
+						}
+						*munger.out = append(*munger.out, *(*hlib.Value)(x))
 					}
 				}
 			}
-			if len(vv) > 0 {
-				hcfg.Env[p.Name] = vv
-			}
 		}
-
-		if p, ok := stmt.(*PathPrepend); ok {
-			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			vv := init_env_map_from(hcfg.Env, p.Name)
-			for tag, v := range p.Value {
-				v = sanitize_env_string(v)
-				if _, haskey := vv[tag]; haskey {
-					old := vv[tag]
-					//fmt.Printf("--> %q\n", old)
-					if old == "" && v == "" {
-						// no-op
-					} else if old != "" && v == "" {
-						vv[tag] = old
-					} else if old == "" && v != "" {
-						vv[tag] = v
-					} else {
-						vv[tag] = fmt.Sprintf("%s:%s", v, old)
-					}
-				} else {
-					if v == "" {
-						vv[tag] = fmt.Sprintf("${%s}", p.Name)
-					} else {
-						vv[tag] = fmt.Sprintf("%s:${%s}", v, p.Name)
-					}
-				}
-			}
-			if len(vv) > 0 {
-				hcfg.Env[p.Name] = vv
-			}
-		}
-
-		if p, ok := stmt.(*SetEnv); ok {
-			//fmt.Printf("--- %q %v\n", p.Name, p.Value)
-			vv := init_env_map_from(hcfg.Env, p.Name)
-			for tag, v := range p.Value {
-				v = sanitize_env_string(v)
-				vv[tag] = v
-			}
-			if len(vv) > 0 {
-				hcfg.Env[p.Name] = vv
-			}
-		}
-
 	}
 
-	out, err := goyaml.Marshal(hscript)
-	handle_err(err)
-
-	_, err = w.Write(out)
-	handle_err(err)
-
-	_, err = fmt.Fprintf(
-		w,
-		"\n## EOF ##\n",
-	)
-	handle_err(err)
-
-	return err
 }
 
 // EOF

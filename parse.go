@@ -80,7 +80,7 @@ func NewParser(fname string) (*Parser, error) {
 		scanner: scanner,
 		req:     &ReqFile{Filename: fname},
 		tokens:  nil,
-		ctx:     []string{tok_PUBLIC},
+		ctx:     []string{tok_BEG_PUBLIC},
 	}
 	return p, nil
 }
@@ -183,7 +183,9 @@ func parse_line(data []byte) ([]string, error) {
 					ttok = ttok[1:]
 				}
 				if strings.HasSuffix(ttok, `"`) || strings.HasSuffix(ttok, "'") {
-					ttok = ttok[:len(ttok)-1]
+					if !strings.HasSuffix(ttok, `\"`) {
+						ttok = ttok[:len(ttok)-1]
+					}
 				}
 				ttok = strings.Trim(ttok, " \t")
 				if len(ttok) > 0 {
@@ -192,6 +194,7 @@ func parse_line(data []byte) ([]string, error) {
 					if len(line_val) > 0 {
 						line_sep = " "
 					}
+					ttok = strings.Replace(ttok, `\"`, `"`, -1)
 					line[len(line)-1] += line_sep + ttok
 				}
 			} else {
@@ -203,8 +206,11 @@ func parse_line(data []byte) ([]string, error) {
 				ttok = ttok[1:]
 			}
 			if strings.HasSuffix(ttok, `"`) || strings.HasSuffix(ttok, "'") {
-				ttok = ttok[:len(ttok)-1]
+				if !strings.HasSuffix(ttok, `\"`) {
+					ttok = ttok[:len(ttok)-1]
+				}
 			}
+			ttok = strings.Replace(ttok, `\"`, `"`, -1)
 			line = append(line, strings.Trim(ttok, " \t"))
 		}
 		if len(tok) == 1 && strings.HasPrefix(tok, "\"") {
@@ -223,7 +229,7 @@ func parse_line(data []byte) ([]string, error) {
 			in_squote = !in_squote
 			my_printf("--> squote: %v -> %v\n", !in_squote, in_squote)
 		}
-		if in_dquote && strings.HasSuffix(tok, "\"") {
+		if in_dquote && strings.HasSuffix(tok, "\"") && !strings.HasSuffix(tok, `\""`) {
 			in_dquote = !in_dquote
 			my_printf("<-- dquote: %v -> %v\n", !in_dquote, in_dquote)
 		}
