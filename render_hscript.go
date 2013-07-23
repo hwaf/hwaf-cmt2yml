@@ -30,7 +30,7 @@ package: {
     authors: {{.Authors | as_hlist}},
 {{if .Managers}}    managers: {{.Managers | as_hlist}},{{end}}
 {{if .Version}}    version:  "{{.Version}}",{{end}}
-    dependencies: {
+    deps: {
 {{. | gen_hscript_pkg_deps}}
     }
 }
