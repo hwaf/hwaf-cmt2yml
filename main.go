@@ -89,7 +89,7 @@ loop:
 		case resp := <-ch:
 			sum += 1
 			if resp.err != nil {
-				fmt.Printf("**err: %v\n", err)
+				fmt.Printf("**err: %v\n", resp.err)
 				allgood = false
 			}
 			if sum == len(fnames) {
