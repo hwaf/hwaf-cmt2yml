@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/hwaf/hwaf/hlib"
@@ -124,6 +126,23 @@ func hlib_value_from_slice(name string, values []string) hlib.Value {
 		}
 	}
 	return hvalue
+}
+
+func w_py_strlist(str []string) string {
+	o := make([]string, 0, len(str))
+	for _, v := range str {
+		vv, err := strconv.Unquote(v)
+		if err != nil {
+			vv = v
+		}
+		if strings.HasPrefix(vv, `"`) && strings.HasSuffix(vv, `"`) {
+			if len(vv) > 1 {
+				vv = vv[1 : len(vv)-1]
+			}
+		}
+		o = append(o, fmt.Sprintf("%q", vv))
+	}
+	return strings.Join(o, ", ")
 }
 
 // EOF
