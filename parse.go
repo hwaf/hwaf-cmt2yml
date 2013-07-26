@@ -141,6 +141,10 @@ func parse_file(fname string) (*ReqFile, error) {
 	defer p.Close()
 
 	err = p.run()
+	if err != nil {
+		fmt.Printf("req=%q [ERR]\n", fname)
+		return nil, err
+	}
 	fmt.Printf("req=%q [done]\n", fname)
 	return p.req, err
 }
