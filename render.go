@@ -222,6 +222,14 @@ func (r *Renderer) analyze() error {
 			val := hlib.Value(*x)
 			wcfg.Stmts = append(wcfg.Stmts, &hlib.MacroAppendStmt{Value: val})
 
+		case *MacroPrepend:
+			if _, ok := macros[x.Name]; ok {
+				// this will be used by a library or application
+				continue
+			}
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.MacroPrependStmt{Value: val})
+
 		case *MacroRemove:
 			if _, ok := macros[x.Name]; ok {
 				// this will be used by a library or application
@@ -238,13 +246,16 @@ func (r *Renderer) analyze() error {
 			val := hlib.Value(*x)
 			wcfg.Stmts = append(wcfg.Stmts, &hlib.PathAppendStmt{Value: val})
 
+		case *PathPrepend:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.PathPrependStmt{Value: val})
+
 		case *PathRemove:
 			val := hlib.Value(*x)
 			wcfg.Stmts = append(wcfg.Stmts, &hlib.PathRemoveStmt{Value: val})
 
 		case *Pattern:
-			//val := hlib.Value(*x)
-			//wcfg.Stmts = append(wcfg.Stmts, &hlib.PatternStmt{Value: val})
+			wcfg.Stmts = append(wcfg.Stmts, (*hlib.PatternStmt)(x))
 
 		case *ApplyPattern:
 			wbld.Stmts = append(wbld.Stmts, (*hlib.ApplyPatternStmt)(x))
@@ -256,16 +267,53 @@ func (r *Renderer) analyze() error {
 			val := hlib.Value(*x)
 			wcfg.Stmts = append(wcfg.Stmts, &hlib.ApplyTagStmt{Value: val})
 
+		case *TagExclude:
+			wcfg.Stmts = append(wcfg.Stmts, (*hlib.TagExcludeStmt)(x))
+
 		case *MakeFragment:
 			wcfg.Stmts = append(wcfg.Stmts, (*hlib.MakeFragmentStmt)(x))
+
+		case *SetEnv:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.SetStmt{Value: val})
+
+		case *SetAppend:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.SetAppendStmt{Value: val})
+
+		case *Package:
+			// already dealt with
+
+		case *Action:
+			// FIXME
+
+		case *IncludePaths:
+			// FIXME
+
+		case *IncludeDirs:
+			// FIXME
+
+		case *CmtPathPattern:
+			// FIXME
+
+		case *IgnorePattern:
+			// FIXME
+
+		default:
+			return fmt.Errorf("unhandled statement [%v] (type=%T)\ndir=%v", x, x, r.req.Filename)
 		}
 	}
 
 	for _, stmt := range r.req.Stmts {
-		switch stmt.(type) {
-		case *PathRemove, *MakeFragment, *Pattern:
+		switch stmt := stmt.(type) {
+		case *PathRemove, *MakeFragment, *Pattern, *MacroRemove:
 			r.wscript = true
-			return nil
+			break
+		case *Macro:
+			if len(stmt.Set) > 1 {
+				r.wscript = true
+				break
+			}
 		}
 	}
 

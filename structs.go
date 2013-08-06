@@ -63,12 +63,14 @@ var g_dispatch = map[string]ParseFunc{
 	"include_dirs":    parseIncludeDirs,
 	"include_path":    parseIncludePaths,
 	"set":             parseSet,
+	"set_append":      parseSetAppend,
 	"tag":             parseTag,
+	"apply_tag":       parseApplyTag,
+	"tag_exclude":     parseTagExclude,
 	"document":        parseDocument,
 	"cmtpath_pattern": parseCmtPathPattern,
 	"make_fragment":   parseMakeFragment,
 	"action":          parseAction,
-	//"apply_tag":      parseApplyTag, //FIXME
 }
 
 type Package struct {
@@ -260,7 +262,21 @@ func (s *SetEnv) ToYaml(w io.Writer) error {
 func parseSet(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := SetEnv(hlib_value_from_slice(tokens[1], tokens[2:]))
+	vv := SetEnv(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
+	p.req.Stmts = append(p.req.Stmts, &vv)
+	return err
+}
+
+type SetAppend hlib.Value
+
+func (s *SetAppend) ToYaml(w io.Writer) error {
+	return nil
+}
+
+func parseSetAppend(p *Parser) error {
+	var err error
+	tokens := p.tokens
+	vv := SetAppend(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -398,6 +414,32 @@ type ApplyTag hlib.Value
 
 func (s *ApplyTag) ToYaml(w io.Writer) error {
 	return nil
+}
+
+func parseApplyTag(p *Parser) error {
+	var err error
+	tokens := p.tokens
+	if tokens[1][0] == '-' {
+		tokens[1], tokens[2] = tokens[2], tokens[1]
+	}
+	vv := ApplyTag(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
+	p.req.Stmts = append(p.req.Stmts, &vv)
+	return err
+}
+
+type TagExclude hlib.TagExcludeStmt
+
+func (s *TagExclude) ToYaml(w io.Writer) error {
+	return nil
+}
+
+func parseTagExclude(p *Parser) error {
+	var err error
+	tokens := p.tokens
+	vv := TagExclude{Name: tokens[1]}
+	vv.Content = append(vv.Content, tokens[2:]...)
+	p.req.Stmts = append(p.req.Stmts, &vv)
+	return err
 }
 
 type Library struct {
