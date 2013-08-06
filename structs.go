@@ -158,7 +158,7 @@ func (s *Macro) ToYaml(w io.Writer) error {
 func parseMacro(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := Macro(hlib_value_from_slice(tokens[1], tokens[2:]))
+	vv := Macro(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -172,7 +172,7 @@ func (s *MacroAppend) ToYaml(w io.Writer) error {
 func parseMacroAppend(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := MacroAppend(hlib_value_from_slice(tokens[1], tokens[2:]))
+	vv := MacroAppend(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -186,7 +186,7 @@ func (s *MacroPrepend) ToYaml(w io.Writer) error {
 func parseMacroPrepend(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := MacroPrepend(hlib_value_from_slice(tokens[1], tokens[2:]))
+	vv := MacroPrepend(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -200,7 +200,7 @@ func (s *MacroRemove) ToYaml(w io.Writer) error {
 func parseMacroRemove(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := MacroRemove(hlib_value_from_slice(tokens[1], tokens[2:]))
+	vv := MacroRemove(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -348,7 +348,7 @@ func (s *Path) ToYaml(w io.Writer) error {
 func parsePath(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := Path(hlib_value_from_slice(tokens[1], tokens[2:]))
+	vv := Path(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -362,7 +362,7 @@ func (s *PathAppend) ToYaml(w io.Writer) error {
 func parsePathAppend(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := PathAppend(hlib_value_from_slice(tokens[1], tokens[2:]))
+	vv := PathAppend(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -376,7 +376,7 @@ func (s *PathRemove) ToYaml(w io.Writer) error {
 func parsePathRemove(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := PathRemove(hlib_value_from_slice(tokens[1], tokens[2:]))
+	vv := PathRemove(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -390,7 +390,7 @@ func (s *PathPrepend) ToYaml(w io.Writer) error {
 func parsePathPrepend(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := PathPrepend(hlib_value_from_slice(tokens[1], tokens[2:]))
+	vv := PathPrepend(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -456,7 +456,7 @@ func parseLibrary(p *Parser) error {
 	tokens := p.tokens
 	vv := Library{Name: tokens[1]}
 	if len(tokens) > 2 {
-		vv.Source = append(vv.Source, tokens[2:]...)
+		vv.Source = append(vv.Source, sanitize_env_strings(tokens[2:])...)
 	}
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
@@ -471,7 +471,7 @@ func (s *Action) ToYaml(w io.Writer) error {
 func parseAction(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := Action(hlib_value_from_slice(tokens[1], tokens[2:]))
+	vv := Action(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
@@ -490,7 +490,7 @@ func parseApplication(p *Parser) error {
 	tokens := p.tokens
 	vv := Application{Name: tokens[1]}
 	if len(tokens) > 2 {
-		vv.Source = append(vv.Source, tokens[2:]...)
+		vv.Source = append(vv.Source, sanitize_env_strings(tokens[2:])...)
 	}
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
@@ -531,7 +531,7 @@ func parseCmtPathPattern(p *Parser) error {
 	var err error
 	tokens := p.tokens
 	vv := CmtPathPattern{}
-	vv.Cmd = append(vv.Cmd, tokens[2:]...)
+	vv.Cmd = append(vv.Cmd, sanitize_env_strings(tokens[2:])...)
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }

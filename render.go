@@ -429,13 +429,13 @@ func sanitize_env_string(v string) string {
 	return v
 }
 
-func sanitize_env_strings(v []string) string {
+func sanitize_env_strings(v []string) []string {
 	o := make([]string, 0, len(v))
 	for _, vv := range v {
 		vv = sanitize_env_string(vv)
 		o = append(o, vv)
 	}
-	return strings.Join(o, " ")
+	return o
 }
 
 // w_distill_tgt inspects a list of CMT macro statements and
