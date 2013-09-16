@@ -96,6 +96,12 @@ func TestParseLine(t *testing.T) {
 				"ppc-rtems-rce405", "echo",
 			},
 		},
+		{
+			fname: "testdata/applytag.txt",
+			expected: []string{
+				"apply_tag", "Foo",
+			},
+		},
 	} {
 		p, err := NewParser(v.fname)
 		if err != nil {
