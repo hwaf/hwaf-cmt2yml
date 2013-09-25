@@ -206,6 +206,10 @@ func (r *Renderer) analyze() error {
 			w_distill_tgt(&tgt, macros)
 			wbld.Targets = append(wbld.Targets, tgt)
 
+		case *Alias:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.AliasStmt{Value: val})
+
 		case *Macro:
 			if _, ok := macros[x.Name]; ok {
 				// this will be used by a library or application
@@ -296,8 +300,14 @@ func (r *Renderer) analyze() error {
 		case *CmtPathPattern:
 			// FIXME
 
+		case *CmtPathPatternReverse:
+			// FIXME
+
 		case *IgnorePattern:
 			// FIXME
+
+		case *Document:
+			wbld.Stmts = append(wbld.Stmts, (*hlib.DocumentStmt)(x))
 
 		default:
 			return fmt.Errorf("unhandled statement [%v] (type=%T)\ndir=%v", x, x, r.req.Filename)

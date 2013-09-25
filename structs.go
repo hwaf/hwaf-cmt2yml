@@ -38,39 +38,46 @@ type Stmt interface {
 type ParseFunc func(p *Parser) error
 
 var g_dispatch = map[string]ParseFunc{
-	"package":         parsePackage,
-	"author":          parseAuthor,
-	"manager":         parseManager,
-	"use":             parseUse,
-	"macro":           parseMacro,
-	"macro_append":    parseMacroAppend,
-	"macro_prepend":   parseMacroPrepend,
-	"macro_remove":    parseMacroRemove,
-	"private":         parsePrivate,
-	"end_private":     parseEndPrivate,
-	"public":          parsePublic,
-	"end_public":      parseEndPublic,
-	"application":     parseApplication,
-	"pattern":         parsePattern,
-	"ignore_pattern":  parseIgnorePattern,
-	"apply_pattern":   parseApplyPattern,
-	"library":         parseLibrary,
-	"version":         parseVersion,
-	"path":            parsePath,
-	"path_append":     parsePathAppend,
-	"path_prepend":    parsePathPrepend,
-	"path_remove":     parsePathRemove,
-	"include_dirs":    parseIncludeDirs,
-	"include_path":    parseIncludePaths,
-	"set":             parseSet,
-	"set_append":      parseSetAppend,
-	"tag":             parseTag,
-	"apply_tag":       parseApplyTag,
-	"tag_exclude":     parseTagExclude,
-	"document":        parseDocument,
-	"cmtpath_pattern": parseCmtPathPattern,
-	"make_fragment":   parseMakeFragment,
-	"action":          parseAction,
+	"package":                 parsePackage,
+	"author":                  parseAuthor,
+	"alias":                   parseAlias,
+	"branches":                parseBranches,
+	"manager":                 parseManager,
+	"use":                     parseUse,
+	"language":                parseLanguage,
+	"macro":                   parseMacro,
+	"macro_append":            parseMacroAppend,
+	"macro_prepend":           parseMacroPrepend,
+	"macro_remove":            parseMacroRemove,
+	"private":                 parsePrivate,
+	"end_private":             parseEndPrivate,
+	"public":                  parsePublic,
+	"end_public":              parseEndPublic,
+	"application":             parseApplication,
+	"pattern":                 parsePattern,
+	"ignore_pattern":          parseIgnorePattern,
+	"apply_pattern":           parseApplyPattern,
+	"library":                 parseLibrary,
+	"version":                 parseVersion,
+	"path":                    parsePath,
+	"path_append":             parsePathAppend,
+	"path_prepend":            parsePathPrepend,
+	"path_remove":             parsePathRemove,
+	"include_dirs":            parseIncludeDirs,
+	"include_path":            parseIncludePaths,
+	"set":                     parseSet,
+	"set_append":              parseSetAppend,
+	"tag":                     parseTag,
+	"apply_tag":               parseApplyTag,
+	"tag_exclude":             parseTagExclude,
+	"document":                parseDocument,
+	"cmtpath_pattern":         parseCmtPathPattern,
+	"cmtpath_pattern_reverse": parseCmtPathPatternReverse,
+	"make_fragment":           parseMakeFragment,
+	"action":                  parseAction,
+	"setup_script":            parseSetupScript,
+	"setup_strategy":          parseSetupStrategy,
+	"build_strategy":          parseBuildStrategy,
 }
 
 type Package struct {
@@ -101,6 +108,34 @@ func parseAuthor(p *Parser) error {
 	for _, tok := range p.tokens[1:] {
 		p.req.Stmts = append(p.req.Stmts, &Author{Name: tok})
 	}
+	return err
+}
+
+type Alias hlib.Value
+
+func (s *Alias) ToYaml(w io.Writer) error {
+	return nil
+}
+
+func parseAlias(p *Parser) error {
+	var err error
+	tokens := p.tokens
+	vv := Alias(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
+	p.req.Stmts = append(p.req.Stmts, &vv)
+	return err
+}
+
+type Branches struct {
+	Name []string
+}
+
+func (s *Branches) ToYaml(w io.Writer) error {
+	return nil
+}
+
+func parseBranches(p *Parser) error {
+	var err error
+	// just ignore.
 	return err
 }
 
@@ -496,6 +531,7 @@ func parseApplication(p *Parser) error {
 	return err
 }
 
+/*
 type Document struct {
 	Name   string
 	Group  string
@@ -518,6 +554,28 @@ func parseDocument(p *Parser) error {
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
+*/
+
+type Document hlib.DocumentStmt
+
+func (s *Document) ToYaml(w io.Writer) error {
+	return nil
+}
+
+func parseDocument(p *Parser) error {
+	var err error
+	tokens := p.tokens
+	if tokens[1][0] == '-' {
+		tokens[1], tokens[2] = tokens[2], tokens[1]
+	}
+	vv := Document{
+		Name: tokens[1],
+		Args: make([]string, len(tokens[2:])),
+	}
+	copy(vv.Args, tokens[2:])
+	p.req.Stmts = append(p.req.Stmts, &vv)
+	return err
+}
 
 type CmtPathPattern struct {
 	Cmd []string
@@ -531,6 +589,23 @@ func parseCmtPathPattern(p *Parser) error {
 	var err error
 	tokens := p.tokens
 	vv := CmtPathPattern{}
+	vv.Cmd = append(vv.Cmd, sanitize_env_strings(tokens[2:])...)
+	p.req.Stmts = append(p.req.Stmts, &vv)
+	return err
+}
+
+type CmtPathPatternReverse struct {
+	Cmd []string
+}
+
+func (s *CmtPathPatternReverse) ToYaml(w io.Writer) error {
+	return nil
+}
+
+func parseCmtPathPatternReverse(p *Parser) error {
+	var err error
+	tokens := p.tokens
+	vv := CmtPathPatternReverse{}
 	vv.Cmd = append(vv.Cmd, sanitize_env_strings(tokens[2:])...)
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
@@ -603,6 +678,30 @@ func parseEndPublic(p *Parser) error {
 	p.ctx = p.ctx[:len(p.ctx)-1]
 	vv := EndPublic(tok_END_PUBLIC)
 	p.req.Stmts = append(p.req.Stmts, &vv)
+	return err
+}
+
+func parseSetupScript(p *Parser) error {
+	var err error
+	// just ignore.
+	return err
+}
+
+func parseSetupStrategy(p *Parser) error {
+	var err error
+	// just ignore.
+	return err
+}
+
+func parseBuildStrategy(p *Parser) error {
+	var err error
+	// just ignore.
+	return err
+}
+
+func parseLanguage(p *Parser) error {
+	var err error
+	// just ignore.
 	return err
 }
 
