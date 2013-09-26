@@ -67,6 +67,7 @@ var g_dispatch = map[string]ParseFunc{
 	"include_path":            parseIncludePaths,
 	"set":                     parseSet,
 	"set_append":              parseSetAppend,
+	"set_remove":              parseSetRemove,
 	"tag":                     parseTag,
 	"apply_tag":               parseApplyTag,
 	"tag_exclude":             parseTagExclude,
@@ -312,6 +313,20 @@ func parseSetAppend(p *Parser) error {
 	var err error
 	tokens := p.tokens
 	vv := SetAppend(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
+	p.req.Stmts = append(p.req.Stmts, &vv)
+	return err
+}
+
+type SetRemove hlib.Value
+
+func (s *SetRemove) ToYaml(w io.Writer) error {
+	return nil
+}
+
+func parseSetRemove(p *Parser) error {
+	var err error
+	tokens := p.tokens
+	vv := SetRemove(hlib_value_from_slice(tokens[1], sanitize_env_strings(tokens[2:])))
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }

@@ -285,6 +285,10 @@ func (r *Renderer) analyze() error {
 			val := hlib.Value(*x)
 			wcfg.Stmts = append(wcfg.Stmts, &hlib.SetAppendStmt{Value: val})
 
+		case *SetRemove:
+			val := hlib.Value(*x)
+			wcfg.Stmts = append(wcfg.Stmts, &hlib.SetRemoveStmt{Value: val})
+
 		case *Package:
 			// already dealt with
 
