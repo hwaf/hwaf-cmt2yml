@@ -6,11 +6,13 @@ type Profile struct {
 }
 
 var (
-	g_profile *Profile = nil
+	g_profile  *Profile = nil
+	g_profiles map[string]*Profile
 )
 
 func init() {
-	g_tdaq_profile := &Profile{
+	g_profiles = make(map[string]*Profile)
+	g_profiles["tdaq"] = &Profile{
 		patterns: map[string]string{
 			// TDAQCExternal
 			"declare_lcg_mapping":  "tdaq_declare_lcg_mapping",
@@ -49,7 +51,20 @@ func init() {
 		},
 	}
 
-	g_profile = g_tdaq_profile
+	g_profiles["detcommon"] = &Profile{
+		patterns: map[string]string{
+			// DetCommonPolicy
+			"detcommon_shared_library":       "detcommon_shared_library",
+			"detcommon_shared_named_library": "detcommon_shared_library",
+			"detcommon_header_installer":     "detcommon_install_headers",
+		},
+		features: map[string][]string{
+			"application": []string{"detcommon_application"},
+			"library":     []string{"detcommon_library"},
+		},
+	}
+
+	g_profile = g_profiles["tdaq"]
 }
 
 // EOF
