@@ -241,9 +241,7 @@ func parseMacroRemove(p *Parser) error {
 	return err
 }
 
-type IncludeDirs struct {
-	Value string
-}
+type IncludeDirs hlib.IncludeDirsStmt
 
 func (s *IncludeDirs) ToYaml(w io.Writer) error {
 	return nil
@@ -252,14 +250,12 @@ func (s *IncludeDirs) ToYaml(w io.Writer) error {
 func parseIncludeDirs(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := IncludeDirs{Value: tokens[1]}
+	vv := IncludeDirs{Value: tokens[1:]}
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }
 
-type IncludePaths struct {
-	Value string
-}
+type IncludePaths hlib.IncludePathStmt
 
 func (s *IncludePaths) ToYaml(w io.Writer) error {
 	return nil
@@ -268,7 +264,7 @@ func (s *IncludePaths) ToYaml(w io.Writer) error {
 func parseIncludePaths(p *Parser) error {
 	var err error
 	tokens := p.tokens
-	vv := IncludePaths{Value: tokens[1]}
+	vv := IncludePaths{Value: tokens[1:]}
 	p.req.Stmts = append(p.req.Stmts, &vv)
 	return err
 }

@@ -296,10 +296,10 @@ func (r *Renderer) analyze() error {
 			// FIXME
 
 		case *IncludePaths:
-			// FIXME
+			wcfg.Stmts = append(wcfg.Stmts, (*hlib.IncludePathStmt)(x))
 
 		case *IncludeDirs:
-			// FIXME
+			wcfg.Stmts = append(wcfg.Stmts, (*hlib.IncludeDirsStmt)(x))
 
 		case *CmtPathPattern:
 			// FIXME
