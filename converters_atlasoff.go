@@ -42,7 +42,7 @@ func use_list(wscript *hlib.Wscript_t) []string {
 			use_pkg = pkg
 		}
 		if use_pkg != "" {
-			uses = append(uses, pkg)
+			uses = append(uses, use_pkg)
 		}
 	}
 	return uses
