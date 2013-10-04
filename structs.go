@@ -106,7 +106,12 @@ func (s *Author) ToYaml(w io.Writer) error {
 
 func parseAuthor(p *Parser) error {
 	var err error
-	for _, tok := range p.tokens[1:] {
+	tokens := strings.Split(strings.Join(p.tokens[1:], " "), ",\n")
+	for _, tok := range tokens {
+		tok = strings.Trim(tok, " ")
+		if len(tok) <= 0 {
+			continue
+		}
 		p.req.Stmts = append(p.req.Stmts, &Author{Name: tok})
 	}
 	return err
@@ -150,7 +155,12 @@ func (s *Manager) ToYaml(w io.Writer) error {
 
 func parseManager(p *Parser) error {
 	var err error
-	for _, tok := range p.tokens[1:] {
+	tokens := strings.Split(strings.Join(p.tokens[1:], " "), ",\n")
+	for _, tok := range tokens {
+		tok = strings.Trim(tok, " ")
+		if len(tok) <= 0 {
+			continue
+		}
 		p.req.Stmts = append(p.req.Stmts, &Manager{Name: tok})
 	}
 	return err
