@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,17 +14,22 @@ func handle_err(err error) {
 	}
 }
 
+var g_profile_name = flag.String("profile", "atlasoff", "name of the profile translator to use")
+
 func main() {
 	fmt.Printf("::: hwaf-cmt2yml\n")
 
+	flag.Parse()
+	g_profile = g_profiles[*g_profile_name]
+
 	dir := "."
-	switch len(os.Args) {
-	case 1:
+	switch len(flag.Args()) {
+	case 0:
 		dir = "."
-	case 2:
-		dir = os.Args[1]
+	case 1:
+		dir = flag.Args()[0]
 	default:
-		panic(fmt.Errorf("cmt2yml takes at most 1 argument (got %d)", len(os.Args)))
+		panic(fmt.Errorf("cmt2yml takes at most 1 argument (got %d)", len(flag.Args())))
 	}
 
 	var err error

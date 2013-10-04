@@ -1,8 +1,15 @@
 package main
 
+import (
+	"github.com/hwaf/hwaf/hlib"
+)
+
+type cnvfct_t func(wscript *hlib.Wscript_t, stmt Stmt) error
+
 type Profile struct {
 	patterns map[string]string
 	features map[string][]string
+	cnvs     map[string]cnvfct_t
 }
 
 var (
