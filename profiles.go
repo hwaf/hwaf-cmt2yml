@@ -71,6 +71,52 @@ func init() {
 		},
 	}
 
+	g_profiles["atlasoff"] = &Profile{
+		patterns: map[string]string{
+			// AtlasPolicy
+			"installed_library":       "atlas_library",
+			"named_installed_library": "atlas_library",
+			"component_library":       "atlas_component",
+			"named_component_library": "atlas_component",
+			"dual_use_library":        "atlas_dual_use_library",
+			"named_dual_use_library":  "atlas_dual_use_library",
+			"tpcnv_library":           "atlas_tpcnv_library",
+			"named_tpcnv_library":     "atlas_tpcnv_library",
+			"declare_joboptions":      "atlas_install_joboptions",
+			"declare_python_modules":  "atlas_install_python_modules",
+			"declare_scripts":         "atlas_install_scripts",
+			"declare_xmls":            "atlas_install_xmls",
+			"declare_java":            "atlas_install_java",
+
+			// AtlasReflex
+			"lcgdict": "atlas_dictionary",
+		},
+		features: map[string][]string{
+			"application": []string{"atlas_application"},
+			"library":     []string{"atlas_library"},
+		},
+		cnvs: map[string]cnvfct_t{
+			// AtlasPolicy
+			"installed_library":       cnv_atlas_library,
+			"named_installed_library": cnv_atlas_library,
+			"component_library":       cnv_atlas_component_library,
+			"named_component_library": cnv_atlas_component_library,
+			"dual_use_library":        cnv_atlas_dual_use_library,
+			"named_dual_use_library":  cnv_atlas_dual_use_library,
+			"tpcnv_library":           cnv_atlas_tpcnv_library,
+			"named_tpcnv_library":     cnv_atlas_tpcnv_library,
+			"declare_joboptions":      cnv_atlas_install_joboptions,
+			"declare_data":            cnv_atlas_install_data,
+			"declare_python_modules":  cnv_atlas_install_python_modules,
+			"declare_scripts":         cnv_atlas_install_scripts,
+			"declare_xmls":            cnv_atlas_install_xmls,
+			"declare_java":            cnv_atlas_install_java,
+
+			// AtlasReflex
+			"lcgdict": cnv_atlas_dictionary,
+		},
+	}
+
 	g_profile = g_profiles["tdaq"]
 }
 

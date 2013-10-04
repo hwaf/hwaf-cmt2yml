@@ -262,7 +262,14 @@ func (r *Renderer) analyze() error {
 			wcfg.Stmts = append(wcfg.Stmts, (*hlib.PatternStmt)(x))
 
 		case *ApplyPattern:
-			wbld.Stmts = append(wbld.Stmts, (*hlib.ApplyPatternStmt)(x))
+			if cnv, ok := g_profile.cnvs[x.Name]; ok {
+				err = cnv(wscript, x)
+				if err != nil {
+					return err
+				}
+			} else {
+				wbld.Stmts = append(wbld.Stmts, (*hlib.ApplyPatternStmt)(x))
+			}
 
 		case *Tag:
 			wcfg.Stmts = append(wcfg.Stmts, (*hlib.TagStmt)(x))
