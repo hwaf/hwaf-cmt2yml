@@ -113,7 +113,7 @@ func init() {
 			"declare_java":            cnv_atlas_install_java,
 
 			// TestPolicy
-			"UnitTest_run":            cnv_atlas_unittest,
+			"UnitTest_run": cnv_atlas_unittest,
 
 			// AtlasReflex
 			"lcgdict": cnv_atlas_dictionary,

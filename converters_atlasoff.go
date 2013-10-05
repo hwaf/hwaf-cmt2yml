@@ -17,7 +17,7 @@ var g_pkg_map = map[string]string{
 	"AtlasCxxPolicy":     "",
 	"AtlasFortranPolicy": "",
 	"AtlasPOOL":          "POOL",
-	"AtlasPython":          "python",
+	"AtlasPython":        "python",
 	"AtlasROOT":          "ROOT",
 	"AtlasReflex":        "Reflex",
 	"AtlasPolicy":        "",
@@ -264,7 +264,7 @@ func cnv_atlas_dictionary(wscript *hlib.Wscript_t, stmt Stmt) error {
 	x := stmt.(*ApplyPattern)
 	margs := cmt_arg_map(x.Args)
 	pkgname := filepath.Base(wscript.Package.Name)
-	libname := margs["dict"]+"Dict"
+	libname := margs["dict"] + "Dict"
 	selfile := pkgname + "/" + margs["selectionfile"]
 	hdrfile := margs["headerfiles"]
 
