@@ -83,25 +83,32 @@ func main() {
 		err error
 	}
 
+	// limit how many goroutines we have in flight
+	// so we don't max out the number of open file descriptors
+	throttle := make(chan struct{}, 100)
 	ch := make(chan Response)
 	for _, fname := range fnames {
 		go func(fname string) {
+			throttle <- struct{}{}
 			reqfile, err := parse_file(fname)
 			if err != nil {
+				<-throttle
 				ch <- Response{
 					reqfile,
-					fmt.Errorf("err w/ file [%s]: %v", fname, err),
+					fmt.Errorf("(parse) err w/ file [%s]: %v", fname, err),
 				}
 				return
 			}
 			err = render_script(reqfile)
 			if err != nil {
+				<-throttle
 				ch <- Response{
 					reqfile,
-					fmt.Errorf("err w/ file [%s]: %v", fname, err),
+					fmt.Errorf("(render) err w/ file [%s]: %v", fname, err),
 				}
 				return
 			}
+			<-throttle
 			ch <- Response{reqfile, nil}
 		}(fname)
 	}
@@ -119,6 +126,7 @@ loop:
 			}
 			if sum == len(fnames) {
 				close(ch)
+				close(throttle)
 				break loop
 			}
 		}
