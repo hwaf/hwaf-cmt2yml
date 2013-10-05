@@ -63,7 +63,7 @@ func cnv_atlas_component_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 		libname = filepath.Base(wscript.Package.Name)
 	default:
 		// named_component_library pattern
-		libname = x.Args[1]
+		libname = x.Args[0]
 	}
 	itgt, tgt := find_tgt(wscript, libname)
 	if itgt < 0 {
