@@ -43,7 +43,6 @@ func is_user_file(fname string) bool {
 	return !auto_gen
 }
 
-
 // str_split slices s into all (non-empty) substrings separated by sep
 func str_split(s, sep string) []string {
 	strs := strings.Split(s, sep)

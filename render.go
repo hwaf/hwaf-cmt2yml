@@ -379,7 +379,7 @@ func (r *Renderer) render() error {
 		fmt.Printf("**warning** file [%s] already present\n", fname)
 		return nil
 	}
-	
+
 	r.w, err = os.Create(fname)
 	if err != nil {
 		return err
