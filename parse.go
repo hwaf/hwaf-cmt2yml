@@ -58,6 +58,7 @@ func (p *Parser) Close() error {
 	}
 	err := p.f.Close()
 	p.f = nil
+	p.scanner = nil
 	return err
 }
 
