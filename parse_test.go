@@ -102,6 +102,46 @@ func TestParseLine(t *testing.T) {
 				"apply_tag", "Foo",
 			},
 		},
+		{
+			fname: "testdata/unittest.txt",
+			expected: []string{
+				//FIXME:
+				//"apply_pattern", "Foo", "name=\"toto was there\"",
+				"apply_pattern", "Foo", "name=\"toto was there",
+			},
+		},
+		{
+			fname: "testdata/unittest2.txt",
+			expected: []string{
+				//FIXME:
+				//"apply_pattern", "Foo", "name='toto was there'",
+				"apply_pattern", "Foo", "name='toto was there",
+			},
+		},
+		{
+			fname: "testdata/unittest3.txt",
+			expected: []string{
+				//FIXME:
+				//"apply_pattern", "Foo", "name=\" toto was there\"",
+				"apply_pattern", "Foo", "name= toto was there",
+			},
+		},
+		{
+			fname: "testdata/unittest4.txt",
+			expected: []string{
+				//FIXME:
+				//"apply_pattern", "Foo", "name=' toto was there'",
+				"apply_pattern", "Foo", "name= toto was there",
+			},
+		},
+		{
+			fname: "testdata/declare_jobo.txt",
+			expected: []string{
+				//FIXME:
+				//"apply_pattern", "declare_joboptions", "files=\"-s=../share *.py\"",
+				"apply_pattern", "declare_joboptions", "files=\"-s=../share *.py",
+			},
+		},
 	} {
 		p, err := NewParser(v.fname)
 		if err != nil {

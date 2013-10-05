@@ -1,0 +1,1 @@
+apply_pattern declare_joboptions files="-s=../share *.py"

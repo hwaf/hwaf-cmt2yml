@@ -6,6 +6,7 @@ import (
 	"fmt"
 	//"io"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -173,6 +174,9 @@ func parse_line(data []byte) ([]string, error) {
 		}
 	}
 
+	dq_re := regexp.MustCompile(`^(|\w*=)".*`)
+	sq_re := regexp.MustCompile(`^(|\w*=)'.*`)
+
 	my_printf("===============\n")
 	my_printf("tokens: %v\n", fmt_line(tokens))
 
@@ -226,14 +230,6 @@ func parse_line(data []byte) ([]string, error) {
 			in_squote = !in_squote
 			continue
 		}
-		if strings.HasPrefix(tok, "\"") && !strings.HasSuffix(tok, "\"") {
-			in_dquote = !in_dquote
-			my_printf("--> dquote: %v -> %v\n", !in_dquote, in_dquote)
-		}
-		if strings.HasPrefix(tok, "'") && !strings.HasSuffix(tok, "'") {
-			in_squote = !in_squote
-			my_printf("--> squote: %v -> %v\n", !in_squote, in_squote)
-		}
 		if in_dquote && strings.HasSuffix(tok, "\"") && !strings.HasSuffix(tok, `\""`) {
 			in_dquote = !in_dquote
 			my_printf("<-- dquote: %v -> %v\n", !in_dquote, in_dquote)
@@ -241,6 +237,18 @@ func parse_line(data []byte) ([]string, error) {
 		if in_squote && strings.HasSuffix(tok, "'") {
 			in_squote = !in_squote
 			my_printf("<-- squote: %v -> %v\n", !in_squote, in_squote)
+		}
+		if dq_re.MatchString(tok) {
+			if !strings.HasSuffix(tok, "\"") || strings.Count(tok, `"`) == 1 {
+				in_dquote = !in_dquote
+				my_printf("--> dquote: %v -> %v\n", !in_dquote, in_dquote)
+			}
+		}
+		if sq_re.MatchString(tok) {
+			if !strings.HasSuffix(tok, "'") || strings.Count(tok, `'`) == 1 {
+				in_squote = !in_squote
+				my_printf("--> squote: %v -> %v\n", !in_squote, in_squote)
+			}
 		}
 	}
 
