@@ -11,17 +11,18 @@ import (
 // map of pkgname -> libname
 //  if empty => ignore dep.
 var g_pkg_map = map[string]string{
-	"AtlasPolicy":        "",
-	"AtlasCxxPolicy":     "",
-	"AtlasFortranPolicy": "",
-	"ExternalPolicy":     "",
-	"GaudiInterface":     "GaudiKernel",
-	"AtlasROOT":          "ROOT",
-	"AtlasReflex":        "Reflex",
 	"AtlasCLHEP":         "CLHEP",
-	"AtlasPOOL":          "POOL",
 	"AtlasCOOL":          "COOL",
 	"AtlasCORAL":         "CORAL",
+	"AtlasCxxPolicy":     "",
+	"AtlasFortranPolicy": "",
+	"AtlasPOOL":          "POOL",
+	"AtlasPython":          "python",
+	"AtlasROOT":          "ROOT",
+	"AtlasReflex":        "Reflex",
+	"AtlasPolicy":        "",
+	"ExternalPolicy":     "",
+	"GaudiInterface":     "GaudiKernel",
 }
 
 func find_tgt(wscript *hlib.Wscript_t, name string) (int, *hlib.Target_t) {
