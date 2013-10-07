@@ -104,7 +104,10 @@ func cnv_atlas_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 		itgt, tgt = find_tgt(wscript, libname)
 	}
 	tgt.Features = []string{"atlas_library"}
-	tgt.Use = []hlib.Value{hlib.DefaultValue("uses", use_list(wscript))}
+	uses := use_list(wscript)
+	if len(uses) > 0 {
+		tgt.Use = []hlib.Value{hlib.DefaultValue("uses", uses)}
+	}
 
 	//fmt.Printf(">>> [%v] \n", *tgt)
 	return nil
@@ -138,7 +141,10 @@ func cnv_atlas_component_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 		itgt, tgt = find_tgt(wscript, libname)
 	}
 	tgt.Features = []string{"atlas_component"}
-	tgt.Use = []hlib.Value{hlib.DefaultValue("uses", use_list(wscript))}
+	uses := use_list(wscript)
+	if len(uses) > 0 {
+		tgt.Use = []hlib.Value{hlib.DefaultValue("uses", uses)}
+	}
 
 	//fmt.Printf(">>> component [%v]...\n", *tgt)
 	return nil
@@ -177,7 +183,10 @@ func cnv_atlas_dual_use_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 		itgt, tgt = find_tgt(wscript, libname)
 	}
 	tgt.Features = []string{"atlas_dual_use_library"}
-	tgt.Use = []hlib.Value{hlib.DefaultValue("uses", use_list(wscript))}
+	uses := use_list(wscript)
+	if len(uses) > 0 {
+		tgt.Use = []hlib.Value{hlib.DefaultValue("uses", uses)}
+	}
 
 	fmt.Printf(">>> [%v] \n", *tgt)
 	return nil
@@ -211,7 +220,10 @@ func cnv_atlas_tpcnv_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 		itgt, tgt = find_tgt(wscript, libname)
 	}
 	tgt.Features = []string{"atlas_tpcnv"}
-	tgt.Use = []hlib.Value{hlib.DefaultValue("uses", use_list(wscript))}
+	uses := use_list(wscript)
+	if len(uses) > 0 {
+		tgt.Use = []hlib.Value{hlib.DefaultValue("uses", uses)}
+	}
 
 	fmt.Printf(">>> [%v] \n", *tgt)
 	return nil
@@ -316,7 +328,10 @@ func cnv_atlas_dictionary(wscript *hlib.Wscript_t, stmt Stmt) error {
 	}
 	tgt.KwArgs["selection_file"] = []hlib.Value{hlib.DefaultValue("selfile", []string{selfile})}
 	//tgt.Use = []hlib.Value{hlib.DefaultValue("uses", use_list(wscript))}
-	tgt.Use = []hlib.Value{hlib.DefaultValue("uses", []string{margs["dict"]})}
+	uses := use_list(wscript)
+	if len(uses) > 0 {
+		tgt.Use = []hlib.Value{hlib.DefaultValue("uses", uses)}
+	}
 	fmt.Printf(">>> %v\n", *tgt)
 	return nil
 }
@@ -349,7 +364,10 @@ func cnv_atlas_unittest(wscript *hlib.Wscript_t, stmt Stmt) error {
 		}
 	}
 	//tgt.Use = []hlib.Value{hlib.DefaultValue("uses", use_list(wscript))}
-	tgt.Use = []hlib.Value{hlib.DefaultValue("uses", []string{pkgname})}
+	uses := use_list(wscript)
+	if len(uses) > 0 {
+		tgt.Use = []hlib.Value{hlib.DefaultValue("uses", uses)}
+	}
 	fmt.Printf(">>> %v\n", *tgt)
 	return nil
 }
