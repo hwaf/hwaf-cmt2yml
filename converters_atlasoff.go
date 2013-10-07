@@ -375,4 +375,100 @@ func cnv_atlas_unittest(wscript *hlib.Wscript_t, stmt Stmt) error {
 	return nil
 }
 
+func cnv_atlas_athenarun_test(wscript *hlib.Wscript_t, stmt Stmt) error {
+	x := stmt.(*ApplyPattern)
+	margs := cmt_arg_map(x.Args)
+	pkgname := filepath.Base(wscript.Package.Name)
+	name := margs["name"]
+	tgtname := fmt.Sprintf("%s-runtest-%s", pkgname, name)
+	options := margs["options"]
+	post := margs["post_script"]
+
+	itgt, tgt := find_tgt(wscript, tgtname)
+	if itgt < 0 {
+		wscript.Build.Targets = append(
+			wscript.Build.Targets,
+			hlib.Target_t{Name: tgtname},
+		)
+		itgt, tgt = find_tgt(wscript, tgtname)
+	}
+	tgt.Features = []string{"atlas_athenarun_test"}
+	if tgt.KwArgs == nil {
+		tgt.KwArgs = make(map[string][]hlib.Value)
+	}
+	if options != "" {
+		tgt.KwArgs["joboptions"] = []hlib.Value{
+			hlib.DefaultValue("options", []string{options}),
+		}
+	}
+	if post != "" {
+		tgt.KwArgs["post_script"] = []hlib.Value{
+			hlib.DefaultValue("post", []string{post}),
+		}
+	}
+	tgt.Use = []hlib.Value{hlib.DefaultValue("uses", []string{pkgname})}
+
+	//fmt.Printf(">>> %v\n", *tgt)
+	return nil
+}
+
+func cnv_atlas_generic_install(wscript *hlib.Wscript_t, stmt Stmt) error {
+	x := stmt.(*ApplyPattern)
+	margs := cmt_arg_map(x.Args)
+	name := margs["name"]
+	source := margs["files"]
+	kind := margs["kind"]
+	prefix := margs["prefix"]
+	pkgname := filepath.Base(wscript.Package.Name)
+	tgtname := fmt.Sprintf("%s-generic-install-%s-%s", pkgname, name, kind)
+
+	itgt, tgt := find_tgt(wscript, tgtname)
+	if itgt < 0 {
+		wscript.Build.Targets = append(
+			wscript.Build.Targets,
+			hlib.Target_t{Name: tgtname},
+		)
+		itgt, tgt = find_tgt(wscript, tgtname)
+	}
+	tgt.Features = []string{"atlas_generic_install"}
+	tgt.Source = []hlib.Value{hlib.DefaultValue("source", []string{source})}
+	if prefix != "" {
+		if tgt.KwArgs == nil {
+			tgt.KwArgs = make(map[string][]hlib.Value)
+		}
+		tgt.KwArgs["install_prefix"] = []hlib.Value{hlib.DefaultValue("prefix", []string{prefix})}
+	}
+	return nil
+}
+
+func cnv_atlas_install_trfs(wscript *hlib.Wscript_t, stmt Stmt) error {
+	x := stmt.(*ApplyPattern)
+	margs := cmt_arg_map(x.Args)
+	jo := margs["jo"]
+	tfs := margs["tfs"]
+	pkgname := filepath.Base(wscript.Package.Name)
+	tgtname := fmt.Sprintf("%s-install-trfs", pkgname)
+
+	itgt, tgt := find_tgt(wscript, tgtname)
+	if itgt < 0 {
+		wscript.Build.Targets = append(
+			wscript.Build.Targets,
+			hlib.Target_t{Name: tgtname},
+		)
+		itgt, tgt = find_tgt(wscript, tgtname)
+	}
+	tgt.Features = []string{"atlas_install_trfs"}
+	tgt.Source = nil
+	if tgt.KwArgs == nil {
+		tgt.KwArgs = make(map[string][]hlib.Value)
+	}
+	if jo != "" {
+		tgt.KwArgs["trf_jo"] = []hlib.Value{hlib.DefaultValue("trf_jo", []string{jo})}
+	}
+	if tfs != "" {
+		tgt.KwArgs["trf_tfs"] = []hlib.Value{hlib.DefaultValue("trf_tfs", []string{tfs})}
+	}
+	return nil
+}
+
 // EOF

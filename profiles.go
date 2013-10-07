@@ -73,6 +73,11 @@ func init() {
 
 	g_profiles["atlasoff"] = &Profile{
 		patterns: map[string]string{
+			// DetCommonPolicy
+			"detcommon_shared_library":       "detcommon_shared_library",
+			"detcommon_shared_named_library": "detcommon_shared_library",
+			"detcommon_header_installer":     "detcommon_install_headers",
+
 			// AtlasPolicy
 			"installed_library":       "atlas_library",
 			"named_installed_library": "atlas_library",
@@ -96,27 +101,44 @@ func init() {
 			"library":     []string{"atlas_library"},
 		},
 		cnvs: map[string]cnvfct_t{
+			// DetCommonPolicy
+			"detcommon_shared_library":         cnv_detcommon_shared_library,
+			"detcommon_shared_generic_library": cnv_detcommon_shared_library,
+			"detcommon_shared_named_library":   cnv_detcommon_shared_library,
+			"detcommon_header_installer":       cnv_detcommon_install_headers,
+			"trigconf_application":             cnv_trigconf_application,
+			"trigconf_generic_application":     cnv_trigconf_application,
+			"detcommon_generic_install":        cnv_detcommon_generic_install,
+			"detcommon_link_files":             cnv_detcommon_generic_install,
+			"detcommon_copy_files":             cnv_detcommon_generic_install,
+			"detcommon_install_docs":           cnv_detcommon_generic_install,
+
 			// AtlasPolicy
-			"installed_library":       cnv_atlas_library,
-			"named_installed_library": cnv_atlas_library,
-			"component_library":       cnv_atlas_component_library,
-			"named_component_library": cnv_atlas_component_library,
-			"dual_use_library":        cnv_atlas_dual_use_library,
-			"named_dual_use_library":  cnv_atlas_dual_use_library,
-			"tpcnv_library":           cnv_atlas_tpcnv_library,
-			"named_tpcnv_library":     cnv_atlas_tpcnv_library,
-			"declare_joboptions":      cnv_atlas_install_joboptions,
-			"declare_data":            cnv_atlas_install_data,
-			"declare_python_modules":  cnv_atlas_install_python_modules,
-			"declare_scripts":         cnv_atlas_install_scripts,
-			"declare_xmls":            cnv_atlas_install_xmls,
-			"declare_java":            cnv_atlas_install_java,
+			"installed_library":        cnv_atlas_library,
+			"named_installed_library":  cnv_atlas_library,
+			"component_library":        cnv_atlas_component_library,
+			"named_component_library":  cnv_atlas_component_library,
+			"dual_use_library":         cnv_atlas_dual_use_library,
+			"named_dual_use_library":   cnv_atlas_dual_use_library,
+			"tpcnv_library":            cnv_atlas_tpcnv_library,
+			"named_tpcnv_library":      cnv_atlas_tpcnv_library,
+			"declare_joboptions":       cnv_atlas_install_joboptions,
+			"declare_data":             cnv_atlas_install_data,
+			"declare_python_modules":   cnv_atlas_install_python_modules,
+			"declare_scripts":          cnv_atlas_install_scripts,
+			"declare_xmls":             cnv_atlas_install_xmls,
+			"declare_java":             cnv_atlas_install_java,
+			"generic_declare_for_link": cnv_atlas_generic_install,
 
 			// TestPolicy
-			"UnitTest_run": cnv_atlas_unittest,
+			"UnitTest_run":   cnv_atlas_unittest,
+			"athenarun_test": cnv_atlas_athenarun_test,
 
 			// AtlasReflex
 			"lcgdict": cnv_atlas_dictionary,
+
+			// PyJobTransforms
+			"declare_job_transforms": cnv_atlas_install_trfs,
 		},
 	}
 
