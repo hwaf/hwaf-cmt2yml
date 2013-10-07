@@ -345,6 +345,11 @@ func (r *Renderer) analyze() error {
 		}
 	}
 
+	// FIXME: refactor ?
+	if strings.HasPrefix(r.pkg.Package.Name, "External") {
+		r.wscript = true
+	}
+
 	// fixups for boost
 	for _, tgt := range wscript.Build.Targets {
 		for _, use := range tgt.Use {

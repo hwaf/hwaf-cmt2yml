@@ -86,7 +86,14 @@ func cnv_atlas_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 	default:
 		// named_installed_library pattern
 		margs := cmt_arg_map(x.Args)
-		libname = margs["name"]
+		libname = margs["library"]
+	}
+	if libname == "" {
+		return fmt.Errorf(
+			"cmt2yml: empty atlas_library name (package=%s, args=%v)",
+			wscript.Package.Name,
+			x.Args,
+		)
 	}
 	itgt, tgt := find_tgt(wscript, libname)
 	if itgt < 0 {
@@ -99,7 +106,7 @@ func cnv_atlas_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 	tgt.Features = []string{"atlas_library"}
 	tgt.Use = []hlib.Value{hlib.DefaultValue("uses", use_list(wscript))}
 
-	fmt.Printf(">>> [%v] \n", *tgt)
+	//fmt.Printf(">>> [%v] \n", *tgt)
 	return nil
 }
 
@@ -113,7 +120,14 @@ func cnv_atlas_component_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 	default:
 		// named_component_library pattern
 		margs := cmt_arg_map(x.Args)
-		libname = margs["name"]
+		libname = margs["library"]
+	}
+	if libname == "" {
+		return fmt.Errorf(
+			"cmt2yml: empty atlas_component name (package=%s, args=%v)",
+			wscript.Package.Name,
+			x.Args,
+		)
 	}
 	itgt, tgt := find_tgt(wscript, libname)
 	if itgt < 0 {
@@ -140,7 +154,19 @@ func cnv_atlas_dual_use_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 	default:
 		// named_dual_use_library pattern
 		margs := cmt_arg_map(x.Args)
-		libname = margs["name"]
+		if _, ok := margs["library"]; ok {
+			libname = margs["library"]
+		} else {
+			libname = filepath.Base(wscript.Package.Name)
+		}
+
+	}
+	if libname == "" {
+		return fmt.Errorf(
+			"cmt2yml: empty atlas_dual_use_library name (package=%s, args=%v)",
+			wscript.Package.Name,
+			x.Args,
+		)
 	}
 	itgt, tgt := find_tgt(wscript, libname)
 	if itgt < 0 {
@@ -168,6 +194,13 @@ func cnv_atlas_tpcnv_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 		// named_tpcnv_library pattern
 		margs := cmt_arg_map(x.Args)
 		libname = margs["name"]
+	}
+	if libname == "" {
+		return fmt.Errorf(
+			"cmt2yml: empty atlas_tpcnv name (package=%s, args=%v)",
+			wscript.Package.Name,
+			x.Args,
+		)
 	}
 	itgt, tgt := find_tgt(wscript, libname)
 	if itgt < 0 {
