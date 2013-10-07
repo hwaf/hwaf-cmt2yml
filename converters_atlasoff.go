@@ -188,7 +188,7 @@ func cnv_atlas_dual_use_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 		tgt.Use = []hlib.Value{hlib.DefaultValue("uses", uses)}
 	}
 
-	fmt.Printf(">>> [%v] \n", *tgt)
+	//fmt.Printf(">>> [%v] \n", *tgt)
 	return nil
 }
 
@@ -225,7 +225,7 @@ func cnv_atlas_tpcnv_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 		tgt.Use = []hlib.Value{hlib.DefaultValue("uses", uses)}
 	}
 
-	fmt.Printf(">>> [%v] \n", *tgt)
+	//fmt.Printf(">>> [%v] \n", *tgt)
 	return nil
 }
 
@@ -332,7 +332,7 @@ func cnv_atlas_dictionary(wscript *hlib.Wscript_t, stmt Stmt) error {
 	if len(uses) > 0 {
 		tgt.Use = []hlib.Value{hlib.DefaultValue("uses", uses)}
 	}
-	fmt.Printf(">>> %v\n", *tgt)
+	//fmt.Printf(">>> %v\n", *tgt)
 	return nil
 }
 
@@ -368,7 +368,7 @@ func cnv_atlas_unittest(wscript *hlib.Wscript_t, stmt Stmt) error {
 	if len(uses) > 0 {
 		tgt.Use = []hlib.Value{hlib.DefaultValue("uses", uses)}
 	}
-	fmt.Printf(">>> %v\n", *tgt)
+	//fmt.Printf(">>> %v\n", *tgt)
 	return nil
 }
 
