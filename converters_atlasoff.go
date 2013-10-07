@@ -11,16 +11,19 @@ import (
 // map of pkgname -> libname
 //  if empty => ignore dep.
 var g_pkg_map = map[string]string{
+	"AtlasBoost":         "boost",
 	"AtlasCLHEP":         "CLHEP",
 	"AtlasCOOL":          "COOL",
 	"AtlasCORAL":         "CORAL",
 	"AtlasCxxPolicy":     "",
 	"AtlasFortranPolicy": "",
 	"AtlasPOOL":          "POOL",
+	"AtlasPolicy":        "",
 	"AtlasPython":        "python",
 	"AtlasROOT":          "ROOT",
 	"AtlasReflex":        "Reflex",
-	"AtlasPolicy":        "",
+	"AtlasTBB":           "tbb",
+	"DetCommonPolicy":    "",
 	"ExternalPolicy":     "",
 	"GaudiInterface":     "GaudiKernel",
 }
