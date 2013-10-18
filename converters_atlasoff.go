@@ -15,6 +15,7 @@ var g_pkg_map = map[string]string{
 	"AtlasCLHEP":         "CLHEP",
 	"AtlasCOOL":          "COOL",
 	"AtlasCORAL":         "CORAL",
+	"AtlasCppUnit":       "CppUnit",
 	"AtlasCxxPolicy":     "",
 	"AtlasFortranPolicy": "",
 	"AtlasPOOL":          "POOL",
