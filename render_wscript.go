@@ -9,9 +9,9 @@ import (
 func (r *Renderer) render_wscript() error {
 	var err error
 
-	enc := hlib.NewWscriptEncoder(r.w)
+	enc := hlib.NewHscriptPyEncoder(r.w)
 	if enc == nil {
-		return fmt.Errorf("got invalid wscript encoder")
+		return fmt.Errorf("got invalid hscript-py encoder")
 	}
 
 	err = enc.Encode(&r.pkg)
