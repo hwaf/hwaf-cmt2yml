@@ -371,7 +371,7 @@ func (r *Renderer) render() error {
 	fname := ""
 	render := r.render_hscript
 	if r.wscript {
-		fname = filepath.Join(pkgdir, "wscript")
+		fname = filepath.Join(pkgdir, "hscript.py")
 		render = r.render_wscript
 	} else {
 		fname = filepath.Join(pkgdir, "hscript.yml")

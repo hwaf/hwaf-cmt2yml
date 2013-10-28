@@ -47,7 +47,7 @@ func main() {
 		if filepath.Base(path) != "requirements" {
 			return nil
 		} else {
-			// check whether a non-automatically generated wscript or hscript.yml
+			// check whether a non-automatically generated hscript.py or hscript.yml
 			// already exist
 			pkgdir := filepath.Dir(filepath.Dir(path))
 			usr_file := false
@@ -57,10 +57,10 @@ func main() {
 					fmt.Printf("** discard [%s] (user-written hscript.yml)\n", pkgdir)
 				}
 			}
-			if path_exists(filepath.Join(pkgdir, "wscript")) {
-				usr_file = is_user_file(filepath.Join(pkgdir, "wscript"))
+			if path_exists(filepath.Join(pkgdir, "hscript.py")) {
+				usr_file = is_user_file(filepath.Join(pkgdir, "hscript.py"))
 				if usr_file {
-					fmt.Printf("** discard [%s] (user-written wscript)\n", pkgdir)
+					fmt.Printf("** discard [%s] (user-written hscript.py)\n", pkgdir)
 				}
 			}
 			if !usr_file {
