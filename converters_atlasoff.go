@@ -10,25 +10,27 @@ import (
 
 // map of pkgname -> libname
 //  if empty => ignore dep.
-var g_pkg_map = map[string]string{
-	"AtlasBoost":         "boost",
-	"AtlasCLHEP":         "CLHEP",
-	"AtlasCOOL":          "COOL",
-	"AtlasCORAL":         "CORAL",
-	"AtlasCppUnit":       "CppUnit",
-	"AtlasCxxPolicy":     "",
-	"AtlasFortranPolicy": "",
-	"AtlasPOOL":          "POOL",
-	"AtlasPolicy":        "",
-	"AtlasPython":        "python",
-	"AtlasPyROOT":        "PyROOT",
-	"AtlasROOT":          "ROOT",
-	"AtlasReflex":        "Reflex",
-	"AtlasTBB":           "tbb",
-	"AtlasValgrind":      "valgrind",
-	"DetCommonPolicy":    "",
-	"ExternalPolicy":     "",
-	"GaudiInterface":     "GaudiKernel",
+var g_pkg_map = map[string][]string{
+	"AtlasAIDA":          []string{"AIDA"},
+	"AtlasBoost":         []string{"AtlasBoost"},
+	"AtlasCLHEP":         []string{"CLHEP"},
+	"AtlasCOOL":          []string{"COOL"},
+	"AtlasCORAL":         []string{"CORAL"},
+	"AtlasCppUnit":       []string{"CppUnit"},
+	"AtlasCxxPolicy":     nil,
+	"AtlasFortranPolicy": nil,
+	"AtlasGdb":           []string{"bfd"},
+	"AtlasPOOL":          []string{"POOL"},
+	"AtlasPolicy":        nil,
+	"AtlasPython":        []string{"AtlasPython"},
+	"AtlasPyROOT":        []string{"PyROOT"},
+	"AtlasROOT":          []string{"ROOT"},
+	"AtlasReflex":        []string{"Reflex"},
+	"AtlasTBB":           []string{"tbb"},
+	"AtlasValgrind":      []string{"valgrind"},
+	"DetCommonPolicy":    nil,
+	"ExternalPolicy":     nil,
+	"GaudiInterface":     []string{"GaudiKernel"},
 }
 
 func find_tgt(wscript *hlib.Wscript_t, name string) (int, *hlib.Target_t) {
@@ -47,10 +49,10 @@ func use_list(wscript *hlib.Wscript_t) []string {
 		pkg := filepath.Base(dep.Name)
 		use_pkg, ok := g_pkg_map[pkg]
 		if !ok {
-			use_pkg = pkg
+			use_pkg = []string{pkg}
 		}
-		if use_pkg != "" {
-			uses = append(uses, use_pkg)
+		if len(use_pkg) > 0 {
+			uses = append(uses, use_pkg...)
 		}
 	}
 	return uses
@@ -317,7 +319,8 @@ func cnv_atlas_dictionary(wscript *hlib.Wscript_t, stmt Stmt) error {
 	pkgname := filepath.Base(wscript.Package.Name)
 	libname := margs["dict"] + "Dict"
 	selfile := pkgname + "/" + margs["selectionfile"]
-	hdrfile := margs["headerfiles"]
+	hdrfiles := strings.Split(margs["headerfiles"], " ")
+	hdrfiles, _ = sanitize_srcs(hdrfiles, "")
 
 	itgt, tgt := find_tgt(wscript, libname)
 	if itgt < 0 {
@@ -328,7 +331,7 @@ func cnv_atlas_dictionary(wscript *hlib.Wscript_t, stmt Stmt) error {
 		itgt, tgt = find_tgt(wscript, libname)
 	}
 	tgt.Features = []string{"atlas_dictionary"}
-	tgt.Source = []hlib.Value{hlib.DefaultValue("source", []string{hdrfile})}
+	tgt.Source = []hlib.Value{hlib.DefaultValue("source", hdrfiles)}
 	if tgt.KwArgs == nil {
 		tgt.KwArgs = make(map[string][]hlib.Value)
 	}

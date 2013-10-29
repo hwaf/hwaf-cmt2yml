@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -131,7 +132,53 @@ func (r *Renderer) analyze() error {
 	// models private/public, end_private/end_public
 	ctx_visible := []bool{true}
 
-	// 3rd pass to collect
+	// 3rd pass: collect libraries and apps
+	// this is to make sure the profile-converters get them already populated
+	for _, stmt := range r.req.Stmts {
+		wbld := &wscript.Build
+		switch x := stmt.(type) {
+		case *Library:
+			tgt := hlib.Target_t{Name: x.Name}
+			srcs, rest := sanitize_srcs(x.Source, "src")
+			// FIXME: handle -s=some/dir
+			if len(rest) > 0 {
+			}
+			val := hlib.Value{
+				Name: x.Name,
+				Set: []hlib.KeyValue{
+					{Tag: "default", Value: srcs},
+				},
+			}
+			tgt.Source = append(tgt.Source, val)
+			if features, ok := g_profile.features["library"]; ok {
+				tgt.Features = features
+			}
+			w_distill_tgt(&tgt, macros)
+			wbld.Targets = append(wbld.Targets, tgt)
+
+		case *Application:
+			tgt := hlib.Target_t{Name: x.Name}
+			srcs, rest := sanitize_srcs(x.Source, "src")
+			// FIXME: handle -s=some/dir
+			if len(rest) > 0 {
+			}
+			val := hlib.Value{
+				Name: x.Name,
+				Set: []hlib.KeyValue{
+					{Tag: "default", Value: srcs},
+				},
+			}
+
+			tgt.Source = append(tgt.Source, val)
+			if features, ok := g_profile.features["application"]; ok {
+				tgt.Features = features
+			}
+			w_distill_tgt(&tgt, macros)
+			wbld.Targets = append(wbld.Targets, tgt)
+		}
+	}
+
+	// 4th pass to collect
 	for _, stmt := range r.req.Stmts {
 		wpkg := &wscript.Package
 		wbld := &wscript.Build
@@ -173,45 +220,6 @@ func (r *Renderer) analyze() error {
 					Type:    deptype,
 				},
 			)
-
-		case *Library:
-			tgt := hlib.Target_t{Name: x.Name}
-			srcs, rest := sanitize_srcs(x.Source)
-			// FIXME: handle -s=some/dir
-			if len(rest) > 0 {
-			}
-			val := hlib.Value{
-				Name: x.Name,
-				Set: []hlib.KeyValue{
-					{Tag: "default", Value: srcs},
-				},
-			}
-			tgt.Source = append(tgt.Source, val)
-			if features, ok := g_profile.features["library"]; ok {
-				tgt.Features = features
-			}
-			w_distill_tgt(&tgt, macros)
-			wbld.Targets = append(wbld.Targets, tgt)
-
-		case *Application:
-			tgt := hlib.Target_t{Name: x.Name}
-			srcs, rest := sanitize_srcs(x.Source)
-			// FIXME: handle -s=some/dir
-			if len(rest) > 0 {
-			}
-			val := hlib.Value{
-				Name: x.Name,
-				Set: []hlib.KeyValue{
-					{Tag: "default", Value: srcs},
-				},
-			}
-
-			tgt.Source = append(tgt.Source, val)
-			if features, ok := g_profile.features["application"]; ok {
-				tgt.Features = features
-			}
-			w_distill_tgt(&tgt, macros)
-			wbld.Targets = append(wbld.Targets, tgt)
 
 		case *Alias:
 			val := hlib.Value(*x)
@@ -327,6 +335,11 @@ func (r *Renderer) analyze() error {
 		case *Document:
 			wbld.Stmts = append(wbld.Stmts, (*hlib.DocumentStmt)(x))
 
+		case *Library:
+			// already dealt with
+		case *Application:
+			// already dealt with
+
 		default:
 			return fmt.Errorf("unhandled statement [%v] (type=%T)\ndir=%v", x, x, r.req.Filename)
 		}
@@ -427,19 +440,40 @@ func render_script(req *ReqFile) error {
 	return err
 }
 
-func sanitize_srcs(sources []string) (srcs []string, rest []string) {
+// matches:
+//  ${package_root}/bla
+//  $(package_root)/bla
+var g_pkg_src_re = regexp.MustCompile(`([${].*?[}]|[$(].*?[)])/`)
+
+// sanitize_srcs
+//  sources: the list of source-strings to sanitize
+//  defdir:  the default directory to prepend to these sources
+func sanitize_srcs(sources []string, defdir string) (srcs []string, rest []string) {
 	srcs = make([]string, 0, len(sources))
 	rest = make([]string, 0)
+	dir := defdir // usually "src" for library and application statements
 	for _, src := range sources {
 		if strings.HasPrefix(src, "../") {
 			src = src[len("../"):]
 		}
 		if strings.HasPrefix(src, "-") {
-			// discard -globals -no_prototypes -s=$(some)/src
-			rest = append(rest, src)
-			continue
+			if strings.HasPrefix(src, "-s=") {
+				dir = src[len("-s="):]
+				if g_pkg_src_re.MatchString(dir) {
+					dir = g_pkg_src_re.ReplaceAllString(dir, "")
+				}
+				// special case for "-s=components"
+				if dir == "components" {
+					dir = "src/components"
+				}
+				continue
+			} else {
+				// discard -globals -no_prototypes
+				rest = append(rest, src)
+				continue
+			}
 		}
-		srcs = append(srcs, src)
+		srcs = append(srcs, filepath.Join(dir, src))
 	}
 	return srcs, rest
 }
