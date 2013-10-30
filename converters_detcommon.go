@@ -37,7 +37,7 @@ func cnv_detcommon_shared_library(wscript *hlib.Wscript_t, stmt Stmt) error {
 		)
 		itgt, tgt = find_tgt(wscript, libname)
 	}
-	tgt.Features = []string{"atlas_library"}
+	tgt.Features = []string{"detcommon_library"}
 	uses := use_list(wscript)
 	if len(uses) > 0 {
 		tgt.Use = []hlib.Value{hlib.DefaultValue("uses", uses)}

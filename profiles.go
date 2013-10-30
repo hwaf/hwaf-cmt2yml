@@ -58,19 +58,6 @@ func init() {
 		},
 	}
 
-	g_profiles["detcommon"] = &Profile{
-		patterns: map[string]string{
-			// DetCommonPolicy
-			"detcommon_shared_library":       "detcommon_shared_library",
-			"detcommon_shared_named_library": "detcommon_shared_library",
-			"detcommon_header_installer":     "detcommon_install_headers",
-		},
-		features: map[string][]string{
-			"application": []string{"detcommon_application"},
-			"library":     []string{"detcommon_library"},
-		},
-	}
-
 	g_profiles["atlasoff"] = &Profile{
 		patterns: map[string]string{
 			// DetCommonPolicy
