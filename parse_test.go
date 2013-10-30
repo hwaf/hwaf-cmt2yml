@@ -107,7 +107,7 @@ func TestParseLine(t *testing.T) {
 			expected: []string{
 				//FIXME:
 				//"apply_pattern", "Foo", "name=\"toto was there\"",
-				"apply_pattern", "Foo", "name=\"toto was there",
+				"apply_pattern", "Foo", `name="toto was there`,
 			},
 		},
 		{
