@@ -66,12 +66,12 @@ func cmt_arg_map(args []string) map[string]string {
 			panic(fmt.Errorf("cmt2yml: could not find '=' in string [%s]", v))
 		}
 		if idx < 1 {
-			panic(fmt.Errorf("cmt2yml: malformed string [%s]", v))
+			panic(fmt.Errorf("cmt2yml: malformed string [%s] (idx<0)", v))
 		}
 		kk := v[:idx]
 		vv := v[idx+1:]
 		if vv == "" {
-			panic(fmt.Errorf("cmt2yml: malformed string [%s]", v))
+			panic(fmt.Errorf("cmt2yml: malformed string [%s] (empty string)", v))
 		}
 		if vv[0] == '"' {
 			vv = vv[1:]
