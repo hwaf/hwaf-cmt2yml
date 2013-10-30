@@ -90,10 +90,20 @@ func NewParser(fname string) (*Parser, error) {
 func (p *Parser) run() error {
 	var err error
 	bline := []byte{}
+	my_printf := func(format string, args ...interface{}) (int, error) {
+		return 0, nil
+	}
+	if dbg_parse_line {
+		my_printf = func(format string, args ...interface{}) (int, error) {
+			return fmt.Printf(format, args...)
+		}
+	}
 	for p.scanner.Scan() {
 		data := p.scanner.Bytes()
 		data = bytes.TrimSpace(data)
+		my_printf("-data: %v\n", string(data))
 		data = bytes.Trim(data, " \t\r\n")
+		my_printf("+data: %v\n", string(data))
 
 		if len(data) == 0 {
 			continue
@@ -105,8 +115,9 @@ func (p *Parser) run() error {
 
 		idx := len(data) - 1
 		if data[idx] == '\\' {
+			my_printf("!data: %v (line-continuation)\n", string(data))
 			bline = append(bline, ' ')
-			bline = append(bline, data[:idx-1]...)
+			bline = append(bline, data[:idx]...)
 			continue
 		} else {
 			bline = append(bline, ' ')
@@ -178,6 +189,7 @@ func parse_line(data []byte) ([]string, error) {
 	sq_re := regexp.MustCompile(`^(|\w*=)'.*`)
 
 	my_printf("===============\n")
+	my_printf("@data: [%v]\n", string(data))
 	my_printf("tokens: %v\n", fmt_line(tokens))
 
 	in_dquote := false
