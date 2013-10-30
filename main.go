@@ -19,7 +19,21 @@ func main() {
 	fmt.Printf("::: hwaf-cmt2yml\n")
 
 	flag.Parse()
-	g_profile = g_profiles[*g_profile_name]
+	ok := false
+	g_profile, ok = g_profiles[*g_profile_name]
+	if !ok {
+		profile_names := make([]string, 0, len(g_profiles))
+		for k, _ := range g_profiles {
+			profile_names = append(profile_names, k)
+		}
+		fmt.Fprintf(
+			os.Stderr,
+			"cmt2yml: invalid profile name (%s). valid ones are: %v\n",
+			*g_profile_name,
+			profile_names,
+		)
+		os.Exit(1)
+	}
 
 	dir := "."
 	switch len(flag.Args()) {
